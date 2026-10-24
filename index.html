@@ -255,6 +255,10 @@
   }
   .portrait img{
     width:100%;display:block;
+    /* 蓝白矢量角色稿融入浅灰页面：白色留白乘进底色后与页面同色，
+       天蓝略微偏相压向站内的钴蓝强调色，避免大面积高饱和色抢戏 */
+    mix-blend-mode:multiply;
+    filter:hue-rotate(16deg) saturate(.92) contrast(1.05);
   }
   .portrait .frame{
     position:absolute;inset:-14px;border:1px solid var(--ink);pointer-events:none;
@@ -264,7 +268,8 @@
   }
   .portrait .frame::before{top:-7px;left:-5px;}
   .portrait .frame::after{bottom:-8px;right:-5px;}
-  body.wireframe .portrait img{filter:brightness(.55) contrast(1.1);}
+  /* WIREFRAME 深黑底上 multiply 会把整张图乘成黑色，恢复为正常叠放 */
+  body.wireframe .portrait img{mix-blend-mode:normal;filter:brightness(.55) contrast(1.1);}
   body.wireframe .portrait .frame{border-color:#4a4a4a;}
 
   /* ============ ACT-2 作品 ============ */
@@ -560,7 +565,7 @@ animation:x
 
       <div class="portrait">
         <div class="frame"></div>
-        <img src="portrait.jpg" alt="陈麒擅肖像">
+        <img src="portrait.png" alt="陈麒擅肖像">
       </div>
 
       <span class="mark" style="left:44%;top:26%;">+</span>
@@ -755,9 +760,9 @@ animation:x
     barsEl.innerHTML = '<b>'+str.slice(0,fill)+'</b>'+str.slice(fill);
     timeEl.textContent = fmt(p);
 
-    /* ACT 指示 */
-    var idx = Math.min(panels.length-1, Math.round(cur/window.innerWidth));
-    actEl.textContent = panels[idx].dataset.act;
+    /* ACT 指示（窗口宽度异常时避免算出非法下标） */
+    var idx = Math.min(panels.length-1, Math.round(cur / (window.innerWidth||1)) || 0);
+    if (panels[idx]) actEl.textContent = panels[idx].dataset.act;
 
     requestAnimationFrame(frame);
   }
@@ -771,5 +776,1400 @@ animation:x
   });
 })();
 </script>
+<!-- ==================================================================
+     【新增模块】点击进入式开场动画 + 音频系统
+     说明：本模块全部为新增，不修改上方任何原有布局 / 文字 / 作品内容。
+     依赖：Three.js r137 (UMD) + GSAP 3
+     模块层级：开场时 z-index 80 覆盖全屏；结束后 z-index 0 沉到内容之下，
+     仅作为底层线稿背景，不遮挡任何内容点击。
+     ================================================================== -->
+<style id="intro-module-style">
+  /* ---------- 舞台容器 ---------- */
+  #introStage{
+    position:fixed;inset:0;z-index:80;overflow:hidden;
+    pointer-events:none;
+    transition:background .4s ease;
+  }
+  #introStage.intro-running{
+    pointer-events:auto;
+    background:#050507;              /* 无 WebGL 时的兜底黑底 */
+  }
+  #introStage.resting{
+    z-index:0;                       /* 沉到原有内容之下 */
+    background:transparent;
+  }
+  #introCanvas{
+    position:absolute;inset:0;width:100%;height:100%;display:block;
+    opacity:0;transition:opacity .6s ease;
+  }
+  /* 原有页面切到线框（深色）模式时，降低场景亮度避免刺眼 */
+  body.wireframe #introCanvas{opacity:.32 !important;}
+
+  /* ---------- 开场期间临时隐藏原有 HUD，结束后自动恢复 ---------- */
+  .topbar,.player,.scrollhint{transition:opacity .6s ease;}
+  body.intro-active .topbar,
+  body.intro-active .player,
+  body.intro-active .scrollhint{opacity:0;}
+
+  /* ---------- FUI 扫描覆盖层 ---------- */
+  .fui{
+    position:absolute;inset:0;z-index:2;pointer-events:none;
+    --fui:#ffffff;
+    color:var(--fui);font-size:10px;letter-spacing:.24em;
+    opacity:0;transition:color .9s ease;
+  }
+  .fui.bp{--fui:#1f49ff;}            /* 蓝图阶段整体转蓝 */
+
+  .fui .corner{
+    position:absolute;width:26px;height:26px;
+    border:1px solid var(--fui);opacity:.72;
+    transition:border-color .9s ease;
+  }
+  .fui .tl{top:20px;left:20px;border-right:0;border-bottom:0;}
+  .fui .tr{top:20px;right:20px;border-left:0;border-bottom:0;}
+  .fui .bl{bottom:20px;left:20px;border-right:0;border-top:0;}
+  .fui .br{bottom:20px;right:20px;border-left:0;border-top:0;}
+
+  .fui-scan{
+    position:absolute;left:0;right:0;height:1px;top:0;
+    background:linear-gradient(90deg,transparent,var(--fui),transparent);
+    opacity:.5;mix-blend-mode:screen;
+    animation:scanSweep 2.8s linear infinite;
+    transition:background .9s;
+  }
+  @keyframes scanSweep{
+    0%{top:-2%;opacity:0}
+    12%{opacity:.55}
+    88%{opacity:.55}
+    100%{top:102%;opacity:0}
+  }
+
+  .fui-reticle{
+    position:absolute;left:50%;top:50%;width:56px;height:56px;
+    transform:translate(-50%,-50%);opacity:.5;
+    animation:reticleBreath 4.4s ease-in-out infinite;
+  }
+  .fui-reticle::before,
+  .fui-reticle::after{
+    content:"";position:absolute;background:var(--fui);
+  }
+  .fui-reticle::before{left:0;right:0;top:50%;height:1px;}
+  .fui-reticle::after{top:0;bottom:0;left:50%;width:1px;}
+  @keyframes reticleBreath{0%,100%{opacity:.22}50%{opacity:.6}}
+
+  .fui-hud{
+    position:absolute;font-size:9px;line-height:1.95;
+    letter-spacing:.26em;text-transform:uppercase;opacity:.88;
+  }
+  .fui-hud .dim{opacity:.5;}
+  .at-tl{left:54px;top:22px;}
+  .at-tr{right:54px;top:22px;text-align:right;}
+  .at-bl{left:54px;bottom:26px;}
+  .at-br{right:54px;bottom:26px;text-align:right;}
+  .fui-hud b{font-weight:400;color:var(--fui);}
+
+  /* ---------- 蓝图技术标注 ---------- */
+  .bp-anno{
+    position:absolute;font-size:9px;letter-spacing:.28em;
+    color:var(--fui);opacity:0;transition:opacity 1s ease .3s;
+  }
+  .fui.bp .bp-anno{opacity:.85;}
+  .bp-leader{
+    position:absolute;height:1px;background:var(--fui);
+    opacity:0;transition:opacity 1s ease .5s;
+  }
+  .fui.bp .bp-leader{opacity:.5;}
+
+  .fui-vignette{
+    position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 50%,
+      rgba(0,0,0,0) 40%, rgba(0,0,0,.34) 74%, rgba(0,0,0,.72) 100%);
+    opacity:0;transition:opacity 1.6s ease;   /* 开场前不可见，避免压暗原页面 */
+  }
+  /* 开场运行时淡入暗角 */
+  #introStage.intro-running .fui-vignette{opacity:1;}
+  #introStage.transitioning .fui-vignette{opacity:0;}
+  /* 转场结束后必须彻底关闭暗角，否则会压住下方内容 */
+  #introStage.resting .fui-vignette{opacity:0 !important;}
+
+  /* ---------- 帷幕：沿「左下 → 右上」对角线开合的两块纸面 ---------- */
+  #curtainWrap{position:fixed;inset:0;z-index:85;pointer-events:none;}
+  .curtain-half{
+    position:absolute;inset:0;background:var(--bg);
+    visibility:hidden;will-change:transform;
+  }
+  .curtain-half.a{clip-path:polygon(0 0,101% 0,0 101%);}   /* 略越过对角线，消除 1px 接缝 */
+  .curtain-half.b{clip-path:polygon(100% 0,100% 100%,0 100%);} /* 对角线右下的一整块 */
+
+  /* ---------- 进入提示 ---------- */
+  #introPrompt{
+    position:fixed;left:50%;bottom:42px;transform:translateX(-50%);
+    z-index:81;pointer-events:none;white-space:nowrap;
+    font-size:10px;letter-spacing:.52em;text-indent:.52em;
+    color:#141414;opacity:.7;
+    animation:promptPulse 2.8s ease-in-out infinite;
+  }
+  #introPrompt.hide{opacity:0 !important;animation:none;transition:opacity .45s;}
+  @keyframes promptPulse{0%,100%{opacity:.22}50%{opacity:.78}}
+
+  /* ---------- 静音按钮（FUI 风格） ---------- */
+  #audioToggle{
+    position:fixed;right:28px;bottom:54px;z-index:120;
+    font-family:inherit;font-size:10px;letter-spacing:.3em;
+    padding:7px 13px;cursor:pointer;
+    color:#141414;background:rgba(245,241,232,.72);
+    border:1px solid rgba(20,20,20,.45);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:all .3s ease;opacity:0;
+  }
+  #audioToggle.show{opacity:1;}
+  #audioToggle:hover{background:#141414;color:#f5f1e8;}
+  #audioToggle.off{color:#8a8a86;border-color:rgba(138,138,134,.5);}
+  body.wireframe #audioToggle{background:rgba(10,10,12,.7);color:#d0d0d0;border-color:#434343;}
+
+  @media (max-width:820px){
+    .fui-hud{font-size:8px;letter-spacing:.18em;}
+    .at-tl,.at-bl{left:26px;}
+    .at-tr,.at-br{right:26px;}
+    .fui .corner{width:20px;height:20px;}
+    #audioToggle{right:18px;bottom:64px;}
+    .bp-anno{font-size:8px;}
+  }
+</style>
+
+<!-- 点击进入提示（开场前可见，点击后消失） -->
+<div id="introPrompt">点击任意处进入 &nbsp;·&nbsp; CLICK TO ENTER</div>
+
+<!-- 3D 舞台 -->
+<div id="introStage" aria-hidden="true">
+  <canvas id="introCanvas"></canvas>
+
+  <div class="fui" id="fuiOverlay">
+    <span class="corner tl"></span><span class="corner tr"></span>
+    <span class="corner bl"></span><span class="corner br"></span>
+    <div class="fui-scan"></div>
+    <div class="fui-reticle"></div>
+
+    <div class="fui-hud at-tl">DETECTION / v2.4<br><span class="dim">FLOCK-Δ · OCTANE SIM</span></div>
+    <div class="fui-hud at-tr">SEQ 0047 &nbsp; FOV 55°<br><span class="dim">LOCK <b id="fuiLock">00</b> / <b id="fuiTotal">00</b></span></div>
+    <div class="fui-hud at-bl">X 000.00 &nbsp; Y 000.00<br><span class="dim">SCAN <b id="fuiScan">00</b>%</span></div>
+    <div class="fui-hud at-br">MATTE WHITE · R 0.86<br><span class="dim">RENDER ↔ BLUEPRINT</span></div>
+
+    <div class="bp-layer">
+      <span class="bp-anno" style="left:9%;top:26%">FIG.01 — FLOCK TRAJECTORY</span>
+      <span class="bp-anno" style="right:8%;top:32%">S-07 · Δv 12.4 m/s</span>
+      <span class="bp-anno" style="left:13%;bottom:27%">WING SPAN 2.10 · PLUME MATTE</span>
+      <span class="bp-anno" style="right:11%;bottom:21%">ORBIT R 16–40 · Δθ 0.18 rad/s</span>
+      <span class="bp-leader" style="left:9%;top:32%;width:8vw"></span>
+      <span class="bp-leader" style="right:8%;top:38%;width:7vw"></span>
+    </div>
+  </div>
+
+  <div class="fui-vignette"></div>
+</div>
+
+<!-- 帷幕：两块沿对角线开合的纸面，开场结束时从中间拉开露出页面 -->
+<div id="curtainWrap" aria-hidden="true">
+  <div class="curtain-half a"></div>
+  <div class="curtain-half b"></div>
+</div>
+
+<button id="audioToggle" type="button" aria-pressed="false">◍&nbsp;&nbsp;声音&nbsp;开</button>
+
+<!-- ==================== 【新增模块】依赖加载器 ====================
+     Three.js r137 + GSAP 3.12.5
+     按顺序尝试多个 CDN 镜像，单个域名打不开时自动换下一个；
+     两个库都尝试结束后派发 'intro-libs-ready'，由下方模块接管初始化。
+     这样即使某个 CDN 被墙 / 临时故障，开场 3D 也不会整体失效。
+================================================================= -->
+<script id="intro-libs-loader">
+(function () {
+  var LIST = {
+    /* 首选同目录本地文件（three.min.js / gsap.min.js，已随页面一起放好），
+       离线、file:// 直接打开、GitHub Pages 都能用；缺失时自动走下面的 CDN 镜像。
+       镜像里 three 只有 0.139.2，API 与 0.137.0 完全兼容，仅作兜底 */
+    three: [
+      './three.min.js',
+      'https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js',
+      'https://unpkg.com/three@0.137.0/build/three.min.js',
+      'https://cdn.bootcdn.net/ajax/libs/three.js/0.139.2/three.min.js',
+      'https://cdn.staticfile.net/three.js/0.139.2/three.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.139.2/three.min.js'
+    ],
+    gsap: [
+      './gsap.min.js',
+      'https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js',
+      'https://unpkg.com/gsap@3.12.5/dist/gsap.min.js',
+      'https://cdn.bootcdn.net/ajax/libs/gsap/3.12.5/gsap.min.js',
+      'https://cdn.staticfile.net/gsap/3.12.5/gsap.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js'
+    ]
+  };
+  var pending = 2;                       // 还剩几个库没加载完
+
+  function done() {
+    if (--pending > 0) return;
+    window.dispatchEvent(new Event('intro-libs-ready'));
+  }
+
+  function load(key, i) {
+    var urls = LIST[key];
+    if (i >= urls.length) {              // 该库所有镜像都失败 → 降级，不再阻塞
+      console.warn('[intro] ' + key + ' 所有镜像均加载失败，已降级');
+      done();
+      return;
+    }
+    var s = document.createElement('script');
+    var settled = false;
+    var timer = setTimeout(function () { // 超时视为失败，换下一个镜像
+      if (settled) return;
+      settled = true;
+      s.onload = s.onerror = null;
+      if (s.parentNode) s.parentNode.removeChild(s);
+      load(key, i + 1);
+    }, 9000);
+
+    s.async = true;
+    s.onload = function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      done();
+    };
+    s.onerror = function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (s.parentNode) s.parentNode.removeChild(s);
+      load(key, i + 1);
+    };
+    s.src = urls[i];
+    document.head.appendChild(s);
+  }
+
+  load('three', 0);
+  load('gsap', 0);
+})();
+</script>
+<script id="intro-module-script">
+(function () {
+  'use strict';
+  if (window.__introModuleLoaded) return;
+  window.__introModuleLoaded = true;
+
+  /* ================================================================
+     一、可调参数（全部集中在这里，改数值即可）
+     ================================================================ */
+  var CONFIG = {
+    BIRD_COUNT:          26,     // 桌面端鸟群数量
+    BIRD_COUNT_MOBILE:   11,     // 移动端自动降量（性能）
+
+    FLIGHT_DURATION:     4.2,    // 鸟群从「左下 → 右上」掠过一整屏的时长（秒）
+    FLY_SPEED:           1.0,    // 飞行速度倍率（相当于整体减速/加速）
+    TRANSITION_DELAY:    2.2,    // 第几秒开始由写实 3D 转成蓝图纸
+    TRANSITION_DURATION: 2.6,    // 写实 → 蓝图线稿的渐变时长（秒）
+    ROAM_SPEED:          0.25,   // 帷幕落下后鸟群巡游速度倍率（越小越慢）
+
+    INTRO_SFX_SRC:       './intro-sfx.mp3', // 开场一次性音效（钟声 + 振翅），与页面同目录
+    SFX_VOLUME:          0.95,   // 开场音效音量 0–1（偏高，一次性，不循环）
+    BELL_VOLUME:         0.85,   // 仅当 intro-sfx 加载失败时的合成钟声音量
+    WING_VOLUME:         0.30,   // 仅当 intro-sfx 加载失败时的合成振翅音量
+
+    BGM_VOLUME:          0.20,   // 常驻 BGM 音量 0–1（环境衬底，偏低）
+    BGM_FADE:            1.2,    // BGM 淡入时长（秒）：与 BGM_LEAD 等长，淡入刚好在音效结束时长到 1
+    BGM_LEAD:            1.2,    // 开场音效结束前多少秒开始淡入 BGM（等于淡入时长 → 无缝衔接）
+    BGM_START_DELAY:     6.2,    // 兜底时点：开场音效元数据读不到时，此时强制起 BGM
+    BGM_SRC:             './bgm.mp3', // 背景音乐文件（与 index.html 同目录；留空则用程序化垫乐）
+    MUTE_BY_DEFAULT:     false   // 是否默认静音
+  };
+
+  var isMobile = window.matchMedia('(max-width: 820px)').matches ||
+                 /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  var BIRD_COUNT = isMobile ? CONFIG.BIRD_COUNT_MOBILE : CONFIG.BIRD_COUNT;
+
+  var stage    = document.getElementById('introStage');
+  var canvasEl = document.getElementById('introCanvas');
+  var fui      = document.getElementById('fuiOverlay');
+  var promptEl = document.getElementById('introPrompt');
+  var audioBtn = document.getElementById('audioToggle');
+
+  /* 依赖是异步加载的，必须每次运行时判断，不能用加载时的静态快照 */
+  function hasGSAP()  { return !!window.gsap; }
+  function hasThree() { return !!window.THREE; }
+
+  /* ================================================================
+     二、音频引擎（Web Audio 合成 + 可选 BGM 文件）
+     设计要点：
+       1. 页面加载即创建 AudioContext（suspended）并预生成混响/噪声缓冲，
+          点击瞬间只需 resume，避免点击后卡顿、音效延迟；
+       2. 全部音频由用户点击触发，绝不自动播放；
+       3. 所有音源统一走 masterGain，静音即全局静音；
+       4. BGM 用 <audio> 元素驱动，静音期间继续走时间轴，取消静音不从头播。
+     ================================================================ */
+  function createAudioEngine() {
+    var ctx = null, master = null, sfxBus = null, bgmBus = null, reverb = null;
+    var noiseBuf = null, bgmEl = null, bgmNode = null;
+    var sfxEl = null, sfxNode = null;          /* 开场一次性音效（飞鸟钟声 mp3） */
+    var bgmFade = null, sfxTimer = null;       /* BGM 淡入增益 / 衔接定时器 */
+    var bgmBlobUrl = null, bgmSrcApplied = ''; /* BGM 预取成 Blob，播放零等待，衔接无缝 */
+    var bgmStarted = false, padStarted = false;
+    var muted = !!CONFIG.MUTE_BY_DEFAULT;
+
+    /* 直接双击 index.html 打开时协议是 file://，Chrome / Edge 会把 <audio>
+       里的本地文件当作「跨源媒体」：createMediaElementSource 接进 Web Audio 后
+       输出的是静音轨（控制台只有警告，不会报错）。所以 file:// 下改为让
+       <audio> 直连声卡播放，用元素的 volume / muted 代替 gain 节点。 */
+    var fileMode = (location.protocol === 'file:') || (location.origin === 'null');
+
+    /* 生成脉冲响应：造出“长混响的大教堂”空间感 */
+    function makeIR(seconds, decay) {
+      var len = Math.floor(ctx.sampleRate * seconds);
+      var buf = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (var c = 0; c < 2; c++) {
+        var d = buf.getChannelData(c);
+        for (var i = 0; i < len; i++) {
+          var t = i / len;
+          d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+        }
+      }
+      return buf;
+    }
+
+    /* 生成白噪声缓冲：供翅膀拍打声复用 */
+    function makeNoise(seconds) {
+      var len = Math.floor(ctx.sampleRate * seconds);
+      var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      return buf;
+    }
+
+    function build() {
+      if (ctx) return true;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      try { ctx = new AC(); } catch (e) { return false; }
+
+      master = ctx.createGain();
+      master.gain.value = muted ? 0 : 1;
+      master.connect(ctx.destination);
+
+      sfxBus = ctx.createGain(); sfxBus.gain.value = 1;    sfxBus.connect(master);
+      bgmBus = ctx.createGain(); bgmBus.gain.value = CONFIG.BGM_VOLUME; bgmBus.connect(master);
+
+      /* 混响发送：钟声的空间感来源 */
+      reverb = ctx.createConvolver();
+      reverb.buffer = makeIR(4.2, 2.6);
+      var wet = ctx.createGain(); wet.gain.value = 0.62;
+      reverb.connect(wet); wet.connect(sfxBus);
+
+      noiseBuf = makeNoise(2.2);
+      return true;
+    }
+
+    /* 把 BGM 指向「已预取的 Blob」或原始文件；Blob 就绪后切过去，播放零等待 */
+    function applyBgmSrc() {
+      if (!bgmEl || !bgmEl.paused) return;      /* 已在播放就不动 src，避免打断 */
+      var src = bgmBlobUrl || CONFIG.BGM_SRC;
+      if (!src || src === bgmSrcApplied) return;
+      bgmSrcApplied = src;
+      bgmEl.src = src;
+      bgmEl.load();
+    }
+
+    /* 页面加载即把 BGM 抓成 Blob：绕开浏览器对「未播放媒体」的预载节流，
+       保证开场音效结束、BGM 需要起来的那个瞬间不用读盘，不会出现空白。 */
+    function prefetchBgm() {
+      if (fileMode) return;                     /* file:// 下 fetch 本地文件必被拦，直接用 <audio> 读盘 */
+      if (!CONFIG.BGM_SRC || typeof fetch !== 'function' ||
+          typeof URL === 'undefined' || !URL.createObjectURL) return;
+      fetch(CONFIG.BGM_SRC).then(function (r) {
+        if (!r.ok) throw new Error('bgm ' + r.status);
+        return r.blob();
+      }).then(function (b) {
+        bgmBlobUrl = URL.createObjectURL(b);
+        applyBgmSrc();
+      }).catch(function () { /* 失败就退回原始文件路径，由 <audio> 自行加载 */ });
+    }
+
+    /* 点击瞬间调用：恢复上下文 */
+    function unlock() {
+      build();
+      if (ctx && ctx.state === 'suspended') ctx.resume();
+      return !!ctx;
+    }
+
+    function now() { return ctx ? ctx.currentTime : 0; }
+
+    /* ---- 音效 1：厚重洪钟（多分音 + 长混响） ---- */
+    function bell(when, vol) {
+      if (!ctx) return;
+      var t = when || ctx.currentTime + 0.05;
+      var bus = ctx.createGain(); bus.gain.value = 1;
+      bus.connect(sfxBus);
+      var send = ctx.createGain(); send.gain.value = 0.85; send.connect(reverb);
+
+      var base = 44;                                  // 低沉基频
+      var parts = [                                   // [频率倍数, 强度, 衰减时长]
+        [1.00, 1.00, 9.0],
+        [2.02, 0.44, 7.4],
+        [2.98, 0.26, 6.2],
+        [4.07, 0.15, 5.0],
+        [5.41, 0.09, 4.2],
+        [6.83, 0.05, 3.6]
+      ];
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        var o = ctx.createOscillator(); o.type = 'sine';
+        o.frequency.value = base * p[0];
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * p[1]), t + 0.012 + p[0] * 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + p[2]);
+        o.connect(g); g.connect(bus); g.connect(send);
+        o.start(t); o.stop(t + p[2] + 0.2);
+      }
+      /* 低频撞击，增加“厚重”体感 */
+      var th = ctx.createOscillator(); th.type = 'sine';
+      th.frequency.setValueAtTime(72, t);
+      th.frequency.exponentialRampToValueAtTime(38, t + 0.55);
+      var tg = ctx.createGain();
+      tg.gain.setValueAtTime(0.0001, t);
+      tg.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * 0.5), t + 0.02);
+      tg.gain.exponentialRampToValueAtTime(0.0001, t + 1.25);
+      th.connect(tg); tg.connect(bus); tg.connect(send);
+      th.start(t); th.stop(t + 1.4);
+    }
+
+    /* ---- 音效 2：飞鸟掠过的振翅声（带通噪声脉冲群） ---- */
+    function wings(when, vol, count) {
+      if (!ctx || !noiseBuf) return;
+      var t0 = when || ctx.currentTime;
+      count = count || 4;
+      for (var i = 0; i < count; i++) {
+        var t = t0 + i * (0.10 + Math.random() * 0.07);
+        var src = ctx.createBufferSource();
+        src.buffer = noiseBuf; src.loop = true;
+
+        var bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.Q.value = 1.1;
+        bp.frequency.setValueAtTime(820 + Math.random() * 600, t);
+        bp.frequency.exponentialRampToValueAtTime(2400 + Math.random() * 1400, t + 0.18);
+
+        var g = ctx.createGain();
+        var peak = Math.max(0.0002, vol * (0.55 + Math.random() * 0.6));
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+
+        src.connect(bp); bp.connect(g); g.connect(sfxBus);
+        src.start(t); src.stop(t + 0.32);
+      }
+    }
+
+    /* ---- 开场一次性音效：直接播放用户提供的「飞鸟钟声」mp3 ----
+       必须在用户点击手势内调用；播放结束后自然停止，不会循环。
+       返回 true 表示已交给音频文件，false 时调用方用合成钟声兜底。
+       衔接：在音效结束前 BGM_LEAD 秒开始淡入 BGM，尾音与 BGM 头做交叉淡化，
+       听起来是一口气接上的，中间没有空白。 */
+    function playIntroSfx() {
+      if (!sfxEl) return false;
+      try {
+        if (fileMode || !ctx) {
+          /* file:// / 无 AudioContext：直连播放，音量交给元素 */
+          sfxEl.muted  = muted;
+          sfxEl.volume = Math.max(0, Math.min(1, CONFIG.SFX_VOLUME));
+        } else if (!sfxNode) {
+          sfxNode = ctx.createMediaElementSource(sfxEl);
+          var g = ctx.createGain();
+          g.gain.value = Math.max(0, Math.min(1, CONFIG.SFX_VOLUME));
+          sfxNode.connect(g); g.connect(sfxBus);   /* 统一走 sfxBus → masterGain，静音可控 */
+        }
+        sfxEl.currentTime = 0;
+        var p = sfxEl.play();
+        if (p && p.catch) p.catch(function () {});
+
+        /* 按音效真实时长提前排程；元数据还没到就等它到 */
+        function scheduleBgm() {
+          var d = sfxEl.duration;
+          if (!isFinite(d) || d <= 0.5) return false;
+          clearTimeout(sfxTimer);
+          sfxTimer = setTimeout(startBGM, Math.max(0, (d - CONFIG.BGM_LEAD) * 1000));
+          return true;
+        }
+        if (!scheduleBgm()) {
+          sfxEl.addEventListener('loadedmetadata', scheduleBgm, { once: true });
+        }
+        /* 兜底：万一 play() 被拦截导致 ended 不触发，也在音效结束时接上 */
+        sfxEl.onended = function () { startBGM(); };
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /* ---- 常驻 BGM ---- */
+    function startBGM() {
+      if (bgmStarted) return;
+      bgmStarted = true;
+
+      if (bgmEl) {
+        applyBgmSrc();                          /* 若预取已完成，此时指向内存 Blob */
+        bgmEl.muted = muted;
+
+        /* file:// 或无 AudioContext：不走 Web Audio 图，元素直连 + 手写淡入 */
+        if (fileMode || !ctx) {
+          bgmEl.volume = 0;
+          var pf = bgmEl.play();
+          if (pf && pf.catch) pf.catch(retryOnGesture);
+          fadeInBgmElement();
+          return;
+        }
+
+        /* 有音频文件：接 media element，循环播放；错开时间轴避免重复头 */
+        if (!bgmNode) {
+          try {
+            bgmNode = ctx.createMediaElementSource(bgmEl);
+            bgmFade = ctx.createGain();
+            bgmFade.gain.value = 0.0001;
+            bgmNode.connect(bgmFade); bgmFade.connect(bgmBus);
+
+            /* 交叉淡化：从 0 平滑推到 1，接住开场音效的尾音 */
+            var nt = ctx.currentTime + 0.02;
+            bgmFade.gain.setValueAtTime(0.0001, nt);
+            bgmFade.gain.linearRampToValueAtTime(1, nt + CONFIG.BGM_FADE);
+          } catch (e) {
+            try { bgmNode.connect(bgmBus); } catch (e2) { /* 忽略 */ }
+          }
+        }
+        var p = bgmEl.play();
+        if (p && p.catch) p.catch(retryOnGesture);
+        return;
+      }
+      if (!ctx) return;
+      startPad();
+    }
+
+    /* 若被浏览器自动播放策略拦截：等下一次用户交互再补播一次，绝不反复重试 */
+    function retryOnGesture() {
+      var retry = function () {
+        document.removeEventListener('pointerdown', retry, true);
+        var pp = bgmEl && bgmEl.play();
+        if (pp && pp.catch) pp.catch(function () {});
+      };
+      document.addEventListener('pointerdown', retry, true);
+    }
+
+    /* file:// 降级时的淡入：没有 gain 节点可用，用定时器推元素 volume */
+    function fadeInBgmElement() {
+      var start = Date.now();
+      var dur = Math.max(0.05, CONFIG.BGM_FADE) * 1000;
+      var timer = setInterval(function () {
+        if (!bgmEl) { clearInterval(timer); return; }
+        var k = (Date.now() - start) / dur;
+        if (k >= 1) {
+          bgmEl.volume = Math.max(0, Math.min(1, CONFIG.BGM_VOLUME));
+          clearInterval(timer);
+          return;
+        }
+        bgmEl.volume = Math.max(0, Math.min(1, CONFIG.BGM_VOLUME * k));
+      }, 40);
+    }
+
+    /* 无音频文件时：原创合成环境垫乐（避免版权问题，可自行替换 BGM_SRC） */
+    function startPad() {
+      if (padStarted) return;
+      padStarted = true;
+
+      var padBus = ctx.createGain(); padBus.gain.value = 0.9; padBus.connect(bgmBus);
+      var lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.Q.value = 0.6; lp.frequency.value = 760;
+      lp.connect(padBus);
+
+      /* 缓慢移动的低通截止，让音色有呼吸感 */
+      var lfoF = ctx.createOscillator(); lfoF.frequency.value = 0.028;
+      var lfoFg = ctx.createGain(); lfoFg.gain.value = 240;
+      lfoF.connect(lfoFg); lfoFg.connect(lp.frequency); lfoF.start();
+
+      /* 五度叠置的长音垫，清冷、无旋律侵略性 */
+      var notes = [55, 82.41, 110, 164.81, 220, 329.63];
+      for (var i = 0; i < notes.length; i++) {
+        var o = ctx.createOscillator();
+        o.type = i < 2 ? 'sine' : 'triangle';
+        o.frequency.value = notes[i];
+        o.detune.value = (i % 2 ? -6 : 6);
+
+        var g = ctx.createGain();
+        g.gain.value = Math.max(0.008, 0.05 - i * 0.0045);
+
+        var lfo = ctx.createOscillator();
+        lfo.frequency.value = 0.042 + i * 0.011;
+        var lg = ctx.createGain(); lg.gain.value = 0.012;
+        lfo.connect(lg); lg.connect(g.gain);
+
+        o.connect(g); g.connect(lp);
+        o.start(); lfo.start();
+      }
+    }
+
+    function setMuted(m) {
+      muted = m;
+      if (master && ctx) {
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, 0.12);
+      }
+      /* 元素静音状态始终与全局静音同步：直连模式下它就是唯一开关，
+         Web Audio 模式下则与 masterGain 同向，避免取消静音后元素仍被静音 */
+      if (sfxEl) sfxEl.muted = m;
+      if (bgmEl) bgmEl.muted = m;
+      if (audioBtn) {
+        audioBtn.textContent = m ? '◍  声音 关' : '◍  声音 开';
+        audioBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
+        audioBtn.classList.toggle('off', m);
+      }
+    }
+
+    /* 媒体元素与 Web Audio 解耦：file:// 直接打开或 AudioContext 不可用时也能出声 */
+    if (CONFIG.INTRO_SFX_SRC) {
+      sfxEl = new Audio();
+      sfxEl.src = CONFIG.INTRO_SFX_SRC;
+      sfxEl.loop = false;
+      sfxEl.preload = 'auto';
+      sfxEl.load();                             /* 主动触发加载，确保时长可读 */
+    }
+    if (CONFIG.BGM_SRC) {
+      bgmEl = new Audio();
+      bgmEl.loop = true;
+      bgmEl.preload = 'auto';
+      applyBgmSrc();
+    }
+
+    /* 预加载：页面一加载就建图并生成缓冲，点击时零等待 */
+    build();
+    setMuted(muted);
+    prefetchBgm();                              /* 同时把 BGM 抓进内存 */
+
+    return {
+      unlock: unlock, now: now,
+      bell: bell, wings: wings, playIntroSfx: playIntroSfx, startBGM: startBGM,
+      setMuted: setMuted,
+      isMuted: function () { return muted; }
+    };
+  }
+
+  var AE = createAudioEngine();
+
+  /* ================================================================
+     三、Three.js 场景：白羽异兽 + 检测框 + 蓝图转场
+     ================================================================ */
+  var scene = null, camera = null, renderer = null, clock = null;
+  var bodyMesh = null, wingMeshL = null, wingMeshR = null;      /* 写实：机身 + 双翼 */
+  var wireBody = null, wireWingL = null, wireWingR = null;      /* 蓝图：同一批矩阵的线框 */
+  var frameLines = null;
+  var frameGeo = null, framePos = null, frameCol = null, frameMat = null;
+  var solidMat = null, wireMat = null;
+  var trailMats = [];
+  var keyLight = null, rimLight = null, ambLight = null;
+  var birds = [];
+  var camRight = null, camUp = null, projV = null;
+  var birdObj = null, wingLObj = null, wingRObj = null, tmpM = null;
+  var trailLines = [];
+
+  /* 飞行轨迹：屏幕「左下角 → 右上角」的一条对角直线。
+     端点放在视锥外 1.35 倍处，保证鸟从左下角外飞入、从右上角外飞出。
+     轨迹随窗口尺寸重算（竖屏 / 横屏都成立）。 */
+  var pathA = null, pathB = null, pathDir = null, pathPerp = null;
+  var motionT = 0;                               /* 已飞行的动画时间（受速度倍率影响） */
+  var lastT = 0;                                 /* 上一帧时间，用于帧间差分 */
+
+  /* 状态：由 GSAP 补间驱动，0→1 完成黑底写实 → 白纸蓝图 */
+  var state = { paper: 0, wire: 0, solid: 1, frames: 0 };
+  var C_BLACK = null, C_PAPER = null;
+  var started = false, resting = false;
+  var hoverId = -1;
+  var mouseNdc = { x: 0, y: 0 };
+  var gaze = { x: 0, y: 0 };
+  var frameCounter = 0;
+
+  /* ================================================================
+     白鸽几何体（程序化建模，不依赖任何外部模型文件）
+     造型：饱满胸腹 + 小头短喙 + 上举后掠的双翼 + 扇形尾羽
+     机身与左右翼拆成三份几何体，各自用 InstancedMesh 批量渲染，
+     每个实例独立合成「机身矩阵 × 翅膀扇动矩阵」，实现真正的振翅。
+     ================================================================ */
+
+  /* 合并多个几何体（索引 → 非索引），保留各自的光滑法线 */
+  function mergeGeos(list) {
+    var i, ng, geos = [], total = 0;
+    for (i = 0; i < list.length; i++) {
+      list[i].computeVertexNormals();
+      ng = list[i].index ? list[i].toNonIndexed() : list[i];
+      geos.push(ng);
+      total += ng.attributes.position.count;
+    }
+    var p = new Float32Array(total * 3), n = new Float32Array(total * 3), off = 0;
+    for (i = 0; i < geos.length; i++) {
+      p.set(geos[i].attributes.position.array, off * 3);
+      n.set(geos[i].attributes.normal.array, off * 3);
+      off += geos[i].attributes.position.count;
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(n, 3));
+    return g;
+  }
+
+  /* 一片羽毛：沿 +X 展开，5 个截面渐窄，羽尖圆钝、自然下垂 */
+  function makeFeatherGeo(len, wid, droop) {
+    var w = wid, d = droop || 0;
+    var sec = [
+      [0, 0, w * 0.46],
+      [len * 0.34, -d * 0.22, w * 0.50],
+      [len * 0.68, -d * 0.60, w * 0.42],
+      [len * 0.90, -d * 0.92, w * 0.26],
+      [len, -d * 1.10, w * 0.07]
+    ];
+    var v = [];
+    for (var i = 0; i < sec.length - 1; i++) {
+      var A = sec[i], B = sec[i + 1];
+      v.push(A[0], A[1], A[2], B[0], B[1], B[2], B[0], B[1], -B[2]);
+      v.push(A[0], A[1], A[2], B[0], B[1], -B[2], A[0], A[1], -A[2]);
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  /* 四点平面（两个三角面） */
+  function quadGeo(a, b, c, d) {
+    var v = [a, b, c, a, c, d], arr = [];
+    for (var i = 0; i < v.length; i++) arr.push(v[i][0], v[i][1], v[i][2]);
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  /* 机身：椭球躯干 + 胸脯 + 颈 + 小头 + 短喙 + 扇形尾羽（+Z 为前） */
+  function makeDoveBodyGeometry() {
+    var parts = [];
+
+    var body = new THREE.SphereGeometry(1, 18, 13);
+    body.scale(0.176, 0.196, 0.425);
+    parts.push(body);
+
+    var breast = new THREE.SphereGeometry(1, 14, 10);
+    breast.scale(0.150, 0.162, 0.200);
+    breast.translate(0, 0.012, 0.225);
+    parts.push(breast);
+
+    /* 颈：把胸与头连起来，让头部在背部视角下仍然是独立的一颗 */
+    var neck = new THREE.SphereGeometry(1, 12, 9);
+    neck.scale(0.076, 0.102, 0.092);
+    neck.translate(0, 0.132, 0.360);
+    parts.push(neck);
+
+    var head = new THREE.SphereGeometry(1, 16, 11);
+    head.scale(0.092, 0.090, 0.100);
+    head.translate(0, 0.208, 0.452);
+    parts.push(head);
+
+    var beak = new THREE.ConeGeometry(0.025, 0.082, 7);
+    beak.rotateX(Math.PI / 2);                 // 锥尖转向 +Z
+    beak.translate(0, 0.198, 0.548);
+    parts.push(beak);
+
+    /* 尾羽：7 片宽羽向后扇形展开，彼此叠压成扇面 */
+    for (var i = 0; i < 7; i++) {
+      var f = makeFeatherGeo(0.50, 0.185, 0.024);
+      f.rotateY(Math.PI / 2 + (i - 3) * 0.132); // +X → -Z，并左右散开
+      f.rotateX(0.10);                          // 尾羽略下垂
+      f.translate(0, 0.050, -0.335);
+      parts.push(f);
+    }
+    return mergeGeos(parts);
+  }
+
+  /* 单侧翅膀：一整片连续翼面（带弧度、后缘羽毛锯齿），sign=-1 镜像成左翼。
+     u 沿翼展 0→1，v 沿弦向 0→1；后缘在 v>0.72 处做锯齿，暗示初级飞羽。 */
+  function wingPoint(u, v) {
+    var span = 1.10 * Math.pow(Math.sin(Math.min(1, u) * Math.PI / 2), 0.80); // 圆滑翼尖
+    var zLE = 0.255 - 0.30 * u;
+    var zTE = -0.245 - 0.30 * u;
+    var chord = (zTE - zLE) * (1 - 0.50 * Math.pow(u, 3));                   // 翼尖收窄
+    var z = zLE + chord * v;
+    if (v > 0.72) {
+      var saw = Math.sin(u * Math.PI * 8);
+      z -= 0.055 * saw * saw * (v - 0.72) / 0.28;
+    }
+    var camber = 0.075 * Math.sin(Math.PI * Math.min(1, u * 1.05)) * (1 - 0.45 * v);
+    return [span, 0.02 + camber - 0.055 * v * v, z];
+  }
+  function makeWingGeometry(sign) {
+    var NU = 24, NV = 3, pos = [], idx = [];
+    for (var iu = 0; iu <= NU; iu++) {
+      for (var iv = 0; iv <= NV; iv++) {
+        var p = wingPoint(iu / NU, iv / NV);
+        pos.push(p[0], p[1], p[2]);
+      }
+    }
+    var row = NV + 1;
+    for (var a = 0; a < NU; a++) {
+      for (var b = 0; b < NV; b++) {
+        var i0 = a * row + b, i1 = i0 + 1, i2 = i0 + row, i3 = i2 + 1;
+        idx.push(i0, i2, i1, i1, i2, i3);
+      }
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    var m = mergeGeos([g]);
+    if (sign < 0) m.scale(-1, 1, 1);
+    return m;
+  }
+
+  /* 按当前视锥重算「左下 → 右上」的对角轨迹端点。
+     同时让轨迹向画面纵深退去（z 从 +8 → -26），鸟群是背对镜头飞远的，
+     看到的是背部与上举的双翼，与参考图的视角一致。 */
+  function computePath() {
+    var halfH = camera.position.z * Math.tan((camera.fov * Math.PI / 180) / 2);
+    var halfW = halfH * camera.aspect;
+    pathA.set(-halfW * 1.35, -halfH * 1.35, 8);   /* 屏幕左下角之外，略靠近镜头 */
+    pathB.set( halfW * 1.35,  halfH * 1.35, -26); /* 屏幕右上角之外，飞向纵深 */
+    pathDir.copy(pathB).sub(pathA).normalize();
+    pathPerp.set(-pathDir.y, pathDir.x, 0);        /* 屏幕内与轨迹垂直的方向，用来铺开鸟群 */
+  }
+
+  /* 蓝图引导线：与主轨迹平行的一组细线，随窗口尺寸更新端点 */
+  function layoutTrails() {
+    for (var i = 0; i < trailLines.length; i++) {
+      var o = (i - 2) * (isMobile ? 5.5 : 9);     /* 垂直铺开 */
+      var z = (i - 2) * 5.5;                      /* 纵深错开 */
+      var pos = trailLines[i].geometry.attributes.position;
+      pos.setXYZ(0, pathA.x + pathPerp.x * o, pathA.y + pathPerp.y * o, z);
+      pos.setXYZ(1, pathB.x + pathPerp.x * o, pathB.y + pathPerp.y * o, z);
+      pos.needsUpdate = true;
+    }
+  }
+
+  function initThree() {
+    var w = window.innerWidth, h = window.innerHeight;
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050507);
+    C_BLACK = new THREE.Color(0x050507);
+    C_PAPER = new THREE.Color(0xe7e6e2);      /* 与页面底色 --bg 完全一致，帷幕接缝无色差 */
+
+    camera = new THREE.PerspectiveCamera(w / h < 1 ? 68 : 55, w / h, 0.1, 500);
+    camera.position.set(0, 0, w / h < 1 ? 62 : 46);
+
+    /* 轨迹相关向量：必须在相机就绪后初始化 */
+    pathA = new THREE.Vector3();
+    pathB = new THREE.Vector3();
+    pathDir = new THREE.Vector3();
+    pathPerp = new THREE.Vector3();
+    computePath();
+
+    renderer = new THREE.WebGLRenderer({
+      canvas: canvasEl, alpha: true, antialias: true, powerPreference: 'low-power'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.6 : 2));
+    renderer.setSize(w, h, false);
+
+    /* 电影级三点光：主光偏暖白、轮廓光冷蓝 */
+    keyLight = new THREE.DirectionalLight(0xffffff, 1.7);  keyLight.position.set(7, 12, 9);
+    rimLight = new THREE.DirectionalLight(0xbcd4ff, 1.1);  rimLight.position.set(-12, -5, -9);
+    ambLight = new THREE.HemisphereLight(0xffffff, 0x0a0a0a, 0.55);
+    scene.add(keyLight, rimLight, ambLight);
+
+    var bodyGeo  = makeDoveBodyGeometry();
+    var wingGeoR = makeWingGeometry(1);
+    var wingGeoL = makeWingGeometry(-1);
+
+    /* 哑光白羽毛材质（写实阶段）：光滑法线，接近参考图的柔和体积感 */
+    solidMat = new THREE.MeshStandardMaterial({
+      color: 0xeeede8, roughness: 0.86, metalness: 0.0,
+      flatShading: false, side: THREE.DoubleSide,
+      transparent: true, opacity: 1
+    });
+    /* 蓝图线框材质（转场后）：同一套几何体的 CAD 式线框 */
+    wireMat = new THREE.MeshBasicMaterial({
+      color: 0x1f49ff, wireframe: true,
+      transparent: true, opacity: 0, depthWrite: false
+    });
+
+    /* 机身、左翼、右翼各一个 InstancedMesh；线框版共享同一份 instanceMatrix */
+    bodyMesh  = new THREE.InstancedMesh(bodyGeo,  solidMat, BIRD_COUNT);
+    wingMeshR = new THREE.InstancedMesh(wingGeoR, solidMat, BIRD_COUNT);
+    wingMeshL = new THREE.InstancedMesh(wingGeoL, solidMat, BIRD_COUNT);
+    wireBody  = new THREE.InstancedMesh(bodyGeo,  wireMat, BIRD_COUNT);
+    wireWingR = new THREE.InstancedMesh(wingGeoR, wireMat, BIRD_COUNT);
+    wireWingL = new THREE.InstancedMesh(wingGeoL, wireMat, BIRD_COUNT);
+    wireBody.instanceMatrix  = bodyMesh.instanceMatrix;
+    wireWingR.instanceMatrix = wingMeshR.instanceMatrix;
+    wireWingL.instanceMatrix = wingMeshL.instanceMatrix;
+
+    var allMeshes = [bodyMesh, wingMeshR, wingMeshL, wireBody, wireWingR, wireWingL];
+    for (var m = 0; m < allMeshes.length; m++) allMeshes[m].frustumCulled = false;
+    scene.add(bodyMesh, wingMeshR, wingMeshL, wireBody, wireWingR, wireWingL);
+
+    /* 实例矩阵合成用的可复用对象（机身 → 翅膀 的父子变换） */
+    birdObj  = new THREE.Object3D();
+    wingLObj = new THREE.Object3D();
+    wingRObj = new THREE.Object3D();
+    tmpM     = new THREE.Matrix4();
+
+    /* 检测框：所有鸟合并成一条 LineSegments，只占 1 个 draw call */
+    var SEG = 10, verts = BIRD_COUNT * SEG * 2;
+    framePos = new Float32Array(verts * 3);
+    frameCol = new Float32Array(verts * 3);
+    frameGeo = new THREE.BufferGeometry();
+    frameGeo.setAttribute('position', new THREE.BufferAttribute(framePos, 3));
+    frameGeo.setAttribute('color', new THREE.BufferAttribute(frameCol, 3));
+    frameMat = new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.9,
+      depthTest: false, depthWrite: false
+    });
+    frameLines = new THREE.LineSegments(frameGeo, frameMat);
+    frameLines.frustumCulled = false;
+    frameLines.renderOrder = 10;
+    scene.add(frameLines);
+
+    /* 蓝图引导线：5 条与飞行轨迹平行的线（不再用椭圆环绕） */
+    var trailGroup = new THREE.Group();
+    for (var i = 0; i < 5; i++) {
+      var tg = new THREE.BufferGeometry();
+      tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      var tm = new THREE.LineBasicMaterial({
+        color: 0x1f49ff, transparent: true, opacity: 0, depthWrite: false
+      });
+      trailMats.push(tm);
+      var line = new THREE.Line(tg, tm);
+      trailLines.push(line);
+      trailGroup.add(line);
+    }
+    layoutTrails();
+    scene.add(trailGroup);
+
+    /* 鸟群参数：全员沿同一条「左下 → 右上」轨迹飞行，
+       用垂直偏移 / 纵深 / 抖动幅度 / 出发延迟 / 速度差 区分个体 */
+    for (var b = 0; b < BIRD_COUNT; b++) {
+      birds.push({
+        phase: Math.random() * Math.PI * 2,
+        ox:    (Math.random() - 0.5) * (isMobile ? 10 : 18),  /* 轨迹垂直方向铺开 */
+        cz:    (Math.random() - 0.5) * (isMobile ? 10 : 16),  /* 纵深错开，制造前后层次 */
+        lift:  0.35 + Math.random() * 1.5,                    /* 上下浮动幅度 */
+        delay: Math.random() * 0.10,                          /* 出发错峰（归一化 0–0.1） */
+        spd:   0.90 + Math.random() * 0.18,                   /* 个体速度差 */
+        flap:  5.5 + Math.random() * 4,
+        scale: 0.70 + Math.random() * 0.70,
+        sx: 0, sy: 0
+      });
+    }
+
+    camRight = new THREE.Vector3();
+    camUp    = new THREE.Vector3();
+    projV    = new THREE.Vector3();
+    clock    = new THREE.Clock();
+
+    /* 交互：鼠标移动 → 视线跟随 + 悬浮检测（画布不吃点击事件） */
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+
+    var totalEl = document.getElementById('fuiTotal');
+    if (totalEl) totalEl.textContent = String(BIRD_COUNT).padStart(2, '0');
+
+    animate();
+  }
+
+  function onPointerMove(e) {
+    mouseNdc.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseNdc.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  }
+
+  /* 每帧计算悬浮：屏幕空间距离最近且够近的鸟 */
+  function updateHover() {
+    if (resting) { /* 结束后仍允许悬浮高亮 */ }
+    var best = 48 * 48, bestId = -1;
+    var px = (mouseNdc.x * 0.5 + 0.5) * window.innerWidth;
+    var py = (-mouseNdc.y * 0.5 + 0.5) * window.innerHeight;
+    for (var i = 0; i < birds.length; i++) {
+      var b = birds[i];
+      var sx = (b.sx * 0.5 + 0.5) * window.innerWidth;
+      var sy = (-b.sy * 0.5 + 0.5) * window.innerHeight;
+      var dx = sx - px, dy = sy - py;
+      var d = dx * dx + dy * dy;
+      if (d < best) { best = d; bestId = i; }
+    }
+    hoverId = bestId;
+    var lockEl = document.getElementById('fuiLock');
+    if (lockEl && frameCounter % 6 === 0) {
+      lockEl.textContent = hoverId >= 0
+        ? String(hoverId + 1).padStart(2, '0')
+        : '00';
+    }
+  }
+
+  /* 向检测框缓冲写入一段线段，返回新的写指针 */
+  function writeSeg(fp, ax, ay, az, bx, by, bz) {
+    framePos[fp] = ax; framePos[fp + 1] = ay; framePos[fp + 2] = az;
+    framePos[fp + 3] = bx; framePos[fp + 4] = by; framePos[fp + 5] = bz;
+    return fp + 6;
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    if (!renderer) return;
+    if (!started) return;          /* 用户点击前不渲染，省电省 GPU */
+
+    var t = clock.getElapsedTime();
+    var dt = Math.min(0.06, Math.max(0, t - lastT));   /* 帧间差分，保证不同帧率下速度一致 */
+    lastT = t;
+    frameCounter++;
+
+    /* 飞行进度：开场全速掠过，帷幕落下后自动放慢为巡游 */
+    motionT += dt * (resting ? CONFIG.ROAM_SPEED : 1);
+    var flightSec = Math.max(1.5, CONFIG.FLIGHT_DURATION / Math.max(0.2, CONFIG.FLY_SPEED));
+
+    /* 视线跟随（阻尼） */
+    gaze.x += (mouseNdc.x * 3.4 - gaze.x) * 0.05;
+    gaze.y += (mouseNdc.y * 2.4 - gaze.y) * 0.05;
+    camera.position.x = gaze.x;
+    camera.position.y = gaze.y;
+    camera.lookAt(0, 0, 0);
+
+    camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+
+    /* 蓝图线条基础色 / 悬浮高亮色 */
+    var blueMix = state.frames;
+    var br = 0.92 + (0.12 - 0.92) * blueMix;
+    var bg = 0.92 + (0.29 - 0.92) * blueMix;
+    var bb = 0.90 + (1.00 - 0.90) * blueMix;
+
+    for (var i = 0; i < birds.length; i++) {
+      var b = birds[i];
+
+      /* 归一化飞行进度：0 = 左下角之外，1 = 右上角之外。
+         结束时停在 1（飞离画面）；进入巡游后按个体相位循环，
+         由于两端都在视锥之外，循环跳变完全发生在屏幕外，不可见。 */
+      var raw = motionT / flightSec * b.spd - b.delay;
+      var q = resting
+        ? raw - Math.floor(raw)                       /* 巡游：无缝循环 */
+        : (raw < 0 ? 0 : (raw > 1 ? 1 : raw));        /* 开场：飞完即停在画面外 */
+
+      /* easeInOutQuad：起飞与收尾都有一次呼吸感，不是匀速直线 */
+      var e = q < 0.5 ? 2 * q * q : 1 - Math.pow(-2 * q + 2, 2) / 2;
+
+      /* 沿对角轨迹推进 + 垂直铺开 + 上下浮动 + 纵深错开 */
+      var px = pathA.x + (pathB.x - pathA.x) * e + pathPerp.x * b.ox + gaze.x * 1.1;
+      var py = pathA.y + (pathB.y - pathA.y) * e + pathPerp.y * b.ox
+             + Math.sin(t * 1.4 + b.phase) * b.lift + gaze.y * 0.8;
+      var pz = pathA.z + (pathB.z - pathA.z) * e
+             + b.cz + Math.sin(t * 0.9 + b.phase) * 1.2;
+
+      /* 机身：朝向沿「左下 → 右上」并略微转向纵深，看到背部与上举的双翼 */
+      birdObj.position.set(px, py, pz);
+      birdObj.lookAt(px + pathDir.x * 10, py + pathDir.y * 10, pz + pathDir.z * 10);
+      birdObj.rotateZ(Math.sin(t * 1.1 + b.phase) * 0.16);      /* 轻微侧倾 */
+      birdObj.scale.setScalar(b.scale);
+      birdObj.updateMatrix();
+      bodyMesh.setMatrixAt(i, birdObj.matrix);
+
+      /* 振翅：两翼绕机身纵轴交替上举 / 下压，右翼用 +角度、左翼镜像用 -角度；
+         roll 让翼面朝镜头翻开，避免背视时只剩一条刀刃状的边 */
+      var wAng = 0.05 + Math.sin(t * b.flap + b.phase) * 0.55;
+      var wRoll = -0.35;
+
+      wingRObj.position.set(0.068, 0.105, 0.075);
+      wingRObj.rotation.set(wRoll, 0, wAng);
+      wingRObj.updateMatrix();
+      tmpM.multiplyMatrices(birdObj.matrix, wingRObj.matrix);
+      wingMeshR.setMatrixAt(i, tmpM);
+
+      wingLObj.position.set(-0.068, 0.105, 0.075);
+      wingLObj.rotation.set(-wRoll, 0, -wAng);
+      wingLObj.updateMatrix();
+      tmpM.multiplyMatrices(birdObj.matrix, wingLObj.matrix);
+      wingMeshL.setMatrixAt(i, tmpM);
+
+      /* 投影坐标，供悬浮判定 */
+      projV.set(px, py, pz).project(camera);
+      b.sx = projV.x; b.sy = projV.y;
+
+      /* ---- 检测框（相机对齐的方形 + 十字准星 + 刻度） ---- */
+      var hh = b.scale * 1.20;
+      var rx = camRight.x * hh, ry = camRight.y * hh, rz = camRight.z * hh;
+      var ux = camUp.x * hh,    uy = camUp.y * hh,    uz = camUp.z * hh;
+      var fp = i * 60;
+      var k;
+
+      /* 四边 */
+      fp = writeSeg(fp, px + rx + ux, py + ry + uy, pz + rz + uz, px + rx - ux, py + ry - uy, pz + rz - uz);
+      fp = writeSeg(fp, px + rx - ux, py + ry - uy, pz + rz - uz, px - rx - ux, py - ry - uy, pz - rz - uz);
+      fp = writeSeg(fp, px - rx - ux, py - ry - uy, pz - rz - uz, px - rx + ux, py - ry + uy, pz - rz + uz);
+      fp = writeSeg(fp, px - rx + ux, py - ry + uy, pz - rz + uz, px + rx + ux, py + ry + uy, pz + rz + uz);
+      /* 中心十字 */
+      var cr = camRight.x * hh * 0.22, cr2 = camRight.y * hh * 0.22, cr3 = camRight.z * hh * 0.22;
+      var cu = camUp.x * hh * 0.22, cu2 = camUp.y * hh * 0.22, cu3 = camUp.z * hh * 0.22;
+      fp = writeSeg(fp, px - cr, py - cr2, pz - cr3, px + cr, py + cr2, pz + cr3);
+      fp = writeSeg(fp, px - cu, py - cu2, pz - cu3, px + cu, py + cu2, pz + cu3);
+      /* 四条边中点的微小刻度 */
+      var tk = 0.12;
+      fp = writeSeg(fp, px + rx, py + ry, pz + rz, px + rx + ux * tk, py + ry + uy * tk, pz + rz + uz * tk);
+      fp = writeSeg(fp, px - rx, py - ry, pz - rz, px - rx - ux * tk, py - ry - uy * tk, pz - rz - uz * tk);
+      fp = writeSeg(fp, px + ux, py + uy, pz + uz, px + ux + rx * tk, py + uy + ry * tk, pz + uz + rz * tk);
+      fp = writeSeg(fp, px - ux, py - uy, pz - uz, px - ux - rx * tk, py - uy - ry * tk, pz - uz - rz * tk);
+
+      /* 颜色：白 → 蓝；悬浮时高亮闪烁 */
+      var crC = br, cgC = bg, cbC = bb;
+      if (i === hoverId) {
+        var blink = 0.55 + 0.45 * Math.sin(t * 5.0);
+        crC = 0.10 + 0.25 * blink;
+        cgC = 0.55 + 0.35 * blink;
+        cbC = 1.0;
+      }
+      for (k = fp - 60; k < fp; k += 3) {
+        frameCol[k] = crC; frameCol[k + 1] = cgC; frameCol[k + 2] = cbC;
+      }
+    }
+
+    /* 三份实例矩阵共 6 个 mesh 使用（线框共享同一份属性），各标一次即可 */
+    bodyMesh.instanceMatrix.needsUpdate = true;
+    wingMeshR.instanceMatrix.needsUpdate = true;
+    wingMeshL.instanceMatrix.needsUpdate = true;
+    frameGeo.attributes.position.needsUpdate = true;
+    frameGeo.attributes.color.needsUpdate = true;
+
+    updateHover();
+
+    if (frameCounter % 6 === 0) {
+      var sEl = document.getElementById('fuiScan');
+      if (sEl && !resting) sEl.textContent = String(52 + Math.floor(Math.random() * 46));
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  /* 状态应用：GSAP 每帧调用 */
+  function applyState() {
+    if (!scene) return;
+    /* 进入 resting 后背景已置空，不再覆盖，避免蓝图底色压住页面内容 */
+    if (!resting) scene.background.copy(C_BLACK).lerp(C_PAPER, state.paper);
+    solidMat.opacity = state.solid;
+    /* 常驻期把线框鸟与检测框压淡，只是底层纹样，不遮挡页面内容 */
+    wireMat.opacity = state.wire * 0.95 * (resting ? 0.21 : 1);
+    frameMat.opacity = (0.55 + 0.35 * state.frames) * (resting ? 0.16 : 1);
+    for (var i = 0; i < trailMats.length; i++) trailMats[i].opacity = 0.7 * state.wire * (resting ? 0.28 : 1);
+    keyLight.intensity = 1.7 * state.solid;
+    rimLight.intensity = 1.1 * state.solid;
+    ambLight.intensity = 0.55 * state.solid + 0.22;
+  }
+
+  /* 转场结束：场景沉到内容之下，成为常驻蓝图底层 */
+  function restScene() {
+    if (resting) return;
+    resting = true;
+    stage.classList.add('resting');
+    stage.classList.remove('intro-running', 'transitioning');
+    document.body.classList.remove('intro-active');
+    if (scene) {
+      scene.background = null;
+      renderer.setClearColor(0x000000, 0);
+    }
+    if (hasGSAP()) {
+      gsap.to(canvasEl, { opacity: 0.45, duration: 1.6, ease: 'power1.out' });
+      /* 常驻期把线框鸟与检测框压成很淡的底层纹样，不让它们盖住页面内容 */
+      gsap.to(wireMat,  { opacity: 0.20, duration: 1.6, ease: 'power1.out' });
+      gsap.to(frameMat, { opacity: 0.14, duration: 1.6, ease: 'power1.out' });
+      for (var ti = 0; ti < trailMats.length; ti++) {
+        gsap.to(trailMats[ti], { opacity: 0.20, duration: 1.6, ease: 'power1.out' });
+      }
+      /* FUI 淡出后彻底移除，确保不会覆盖下方内容 */
+      gsap.to(fui, {
+        opacity: 0, duration: 1.4, ease: 'power1.out',
+        onComplete: function () { fui.style.display = 'none'; }
+      });
+    } else {
+      canvasEl.style.opacity = 0.45;
+      if (wireMat) wireMat.opacity = 0.20;
+      if (frameMat) frameMat.opacity = 0.14;
+      for (var tj = 0; tj < trailMats.length; tj++) trailMats[tj].opacity = 0.20;
+      fui.style.display = 'none';
+    }
+
+    audioBtn.classList.add('show');
+  }
+
+  window.addEventListener('resize', function () {
+    if (!renderer) return;
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    var narrow = w / h < 1;
+    camera.fov = narrow ? 68 : 55;
+    camera.position.z = narrow ? 62 : 46;
+    camera.updateProjectionMatrix();
+    computePath();          /* 视锥变化后重算对角轨迹，保证仍是左下 → 右上 */
+    layoutTrails();
+  });
+
+  /* ================================================================
+     四、开场触发（严格依赖用户点击）
+     ================================================================ */
+  function startIntro() {
+    if (started) return;
+    started = true;
+
+    promptEl.classList.add('hide');
+    document.body.classList.add('intro-active');
+    stage.classList.add('intro-running');
+    audioBtn.classList.add('show');            /* 开场即可静音 */
+
+    /* 1) 解锁音频（点击手势内完成），并立刻播放用户提供的「飞鸟钟声」 */
+    var audioOK = AE.unlock();
+    var sfxOK = AE.playIntroSfx();
+    if (audioOK && !sfxOK) {
+      /* 兜底：音效文件缺失 / 被浏览器拒绝时才用合成钟声 + 振翅 */
+      var t0 = AE.now() + 0.06;
+      AE.bell(t0, CONFIG.BELL_VOLUME);
+      AE.bell(t0 + 3.0, CONFIG.BELL_VOLUME * 0.5);
+      var wingAt = [1.0, 2.2, 3.3, 4.5];
+      for (var i = 0; i < wingAt.length; i++) {
+        AE.wings(t0 + wingAt[i], CONFIG.WING_VOLUME, 4);
+      }
+    }
+
+    /* 2) BGM：正常情况下由 playIntroSfx() 按音效真实时长无缝衔接；
+       这里只保留一个兜底时点，防止音效元数据始终读不到 */
+    setTimeout(function () { AE.startBGM(); }, CONFIG.BGM_START_DELAY * 1000);
+
+    /* 3) 画面时间轴 */
+    afterGSAP(runTransition, startFallbackTransition);
+  }
+
+  /* GSAP 就绪则立刻执行；CDN 稍慢则短暂轮询，超时（约 8s）再降级 */
+  function afterGSAP(onReady, onFail) {
+    if (hasGSAP()) { onReady(); return; }
+    var tries = 0;
+    var iv = setInterval(function () {
+      if (hasGSAP()) { clearInterval(iv); onReady(); }
+      else if (++tries > 40) { clearInterval(iv); onFail(); }
+    }, 200);
+  }
+
+  var transitionStarted = false;
+
+  /* 主动画：鸟群先以写实 3D 从屏幕左下角飞向右上角，
+     同时在 TRANSITION_DELAY 之后用 TRANSITION_DURATION 秒转成蓝图纸，
+     转场结束即拉起帷幕，露出网页。 */
+  function runTransition() {
+    if (transitionStarted || resting) return;
+    transitionStarted = true;
+    gsap.to(canvasEl, { opacity: 1, duration: 0.6, ease: 'power2.out' });
+    gsap.to(fui, { opacity: 1, duration: 0.9, ease: 'power2.out' });
+
+    gsap.to(state, {
+      paper: 1, wire: 1, solid: 0, frames: 1,
+      duration: CONFIG.TRANSITION_DURATION,
+      delay: CONFIG.TRANSITION_DELAY,
+      ease: 'power2.inOut',
+      onStart: function () {
+        stage.classList.add('transitioning');
+        fui.classList.add('bp');                 // FUI 转蓝图纸
+      },
+      onUpdate: applyState,
+      onComplete: revealCurtain
+    });
+  }
+
+  /* 帷幕：两块纸面沿「左下 → 右上」对角线向两侧滑开，露出网页内容。
+     拉开前先把 3D 场景沉到页面之下——此刻整屏被纸面遮住，跳变不可见。 */
+  function revealCurtain() {
+    var wrap = document.getElementById('curtainWrap');
+    var halves = wrap ? wrap.querySelectorAll('.curtain-half') : [];
+
+    if (!wrap || !halves.length) { restScene(); return; }
+
+    /* 先立起纸面，再让场景沉底：同一帧内完成，用户看不到中间态 */
+    halves[0].style.visibility = 'visible';
+    halves[1].style.visibility = 'visible';
+    restScene();
+
+    if (!hasGSAP()) { wrap.style.display = 'none'; return; }
+
+    var dur = 1.2, ease = 'power2.inOut';
+    /* 左上块向左上滑出、右下块向右下滑出：沿对角线垂直方向分开 */
+    gsap.to(halves[0], { xPercent: -105, yPercent: -105, duration: dur, ease: ease });
+    gsap.to(halves[1], {
+      xPercent: 105, yPercent: 105, duration: dur, ease: ease, delay: 0.07,
+      onComplete: function () { wrap.style.display = 'none'; }
+    });
+  }
+
+  /* 无 GSAP 兜底：不插值，直接切到蓝图状态并在结尾拉起帷幕 */
+  function startFallbackTransition() {
+    if (transitionStarted || resting) return;
+    transitionStarted = true;
+    canvasEl.style.opacity = 1;
+    fui.style.opacity = 1;
+    setTimeout(function () {
+      stage.classList.add('transitioning');
+      fui.classList.add('bp');
+      state.paper = 1; state.wire = 1; state.solid = 0; state.frames = 1;
+      applyState();
+      revealCurtain();
+    }, (CONFIG.TRANSITION_DELAY + CONFIG.TRANSITION_DURATION) * 1000);
+  }
+
+  /* 首次交互即开场；点静音按钮不算。
+     同时监听 pointerdown / click / touchstart，保证桌面、移动端与自动化点击都能触发 */
+  var FIRST_EVENTS = ['pointerdown', 'click', 'touchstart'];
+  function onFirstInteract(e) {
+    if (e.target && e.target.closest && e.target.closest('#audioToggle')) return;
+    for (var i = 0; i < FIRST_EVENTS.length; i++) {
+      document.removeEventListener(FIRST_EVENTS[i], onFirstInteract, true);
+    }
+    startIntro();
+  }
+  for (var fe = 0; fe < FIRST_EVENTS.length; fe++) {
+    document.addEventListener(FIRST_EVENTS[fe], onFirstInteract, true);
+  }
+
+  /* 静音 / 恢复：全局生效（开场音效 + BGM 一起） */
+  audioBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    AE.setMuted(!AE.isMuted());
+  });
+
+  /* 启动 3D：依赖异步到达，用事件驱动；已提前到达则立即初始化 */
+  function boot3D() {
+    if (renderer || !hasThree()) return;
+    try {
+      initThree();
+    } catch (err) {
+      console.warn('[intro] WebGL 初始化失败，已降级为音频版开场', err);
+      renderer = null; scene = null;
+      return;
+    }
+    if (resting) {
+      /* 依赖晚于开场结束才到：把场景直接固定在常驻蓝图状态 */
+      scene.background = null;
+      renderer.setClearColor(0x000000, 0);
+      canvasEl.style.opacity = 0.45;
+      applyState();
+    } else if (started && !transitionStarted) {
+      /* 开场已触发但时间轴还没建立：补上转场 */
+      afterGSAP(runTransition, startFallbackTransition);
+    }
+  }
+  window.__introBoot3D = boot3D;
+  window.addEventListener('intro-libs-ready', boot3D);
+  boot3D();
+})();
+</script>
+<!-- ==================== 【新增模块】结束 ==================== -->
+
 </body>
 </html>
