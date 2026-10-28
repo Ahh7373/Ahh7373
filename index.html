@@ -383,6 +383,328 @@
     .axis-gizmo,.cam-tag{display:none;}
     .cityline .b{font-size:18px;}
   }
+
+  /* ============ ACT-1H 故乡 · 卡带档案（新增面板） ============ */
+  .panel-home{
+    --h-ink:#141414;
+    --h-txt:#3c3c38;
+    --h-gray:#8a8a86;
+    --h-line:rgba(20,20,20,.22);
+    --h-line-2:rgba(20,20,20,.12);
+    --h-accent:#1f49ff;
+    --h-panel:rgba(255,255,255,.24);
+  }
+  .home-meta{
+    position:absolute;left:6vw;top:34vh;width:16vw;min-width:168px;z-index:9;
+    letter-spacing:.1em;color:var(--h-txt);
+  }
+  .hm-os{font-size:12.5px;font-weight:700;letter-spacing:.32em;color:var(--h-ink);white-space:nowrap;}
+  .hm-sub{font-size:8.5px;letter-spacing:.2em;color:var(--h-gray);margin-top:5px;line-height:1.8;}
+  .hm-file{display:flex;align-items:baseline;gap:.9em;margin-top:2.6em;font-size:9px;letter-spacing:.22em;color:var(--h-gray);}
+  .hm-file b{font-size:14px;letter-spacing:.14em;color:var(--h-accent);font-weight:400;}
+  .hm-rule{display:block;height:1px;background:var(--h-line);margin:1.4em 0;}
+  .hm-txt{font-size:10px;line-height:2.3;letter-spacing:.12em;}
+  .hm-txt.dim{color:var(--h-gray);margin-top:1.2em;}
+
+  /* 档案袋阵列（参考 RHINE LAB 档案袋动画） */
+  .tape-rack{
+    position:absolute;left:21vw;top:20vh;width:40vw;height:62vh;z-index:8;
+    perspective:1500px;perspective-origin:50% 46%;
+  }
+  .rack-rail{
+    position:absolute;left:0;right:0;bottom:4%;height:1px;background:var(--h-line);
+    transform:scaleX(0);transform-origin:0 50%;transition:transform .9s .15s cubic-bezier(.3,.7,.2,1);
+  }
+  .panel-home.is-live .rack-rail{transform:none;}
+  .rack-rail::after{
+    content:'';position:absolute;left:0;right:0;top:0;height:7px;
+    background:repeating-linear-gradient(90deg,var(--h-line-2) 0 1px,transparent 1px 24px);
+  }
+  .fold-field{position:absolute;inset:0;transform-style:preserve-3d;}
+
+  .fold{
+    position:absolute;
+    left:calc(var(--c) * 17%);
+    top:calc(var(--t) * 1%);
+    width:clamp(104px,10.4vw,168px);
+    transform-origin:50% 92%;
+    transform:
+      translate3d(0, calc(var(--u,0) * -44px), 0)
+      rotateY(calc(-19deg + var(--u,0) * 18deg))
+      rotateZ(calc(var(--rz,0) * 1deg))
+      scale(calc(var(--s,1) + var(--u,0) * .06));
+    will-change:transform;
+    filter:drop-shadow(0 9px 14px rgba(20,20,20,.09));
+    transition:filter .4s ease,opacity .45s ease;
+    cursor:pointer;outline:none;
+  }
+  .fold svg{display:block;width:100%;height:auto;overflow:visible;}
+  .fold.ghost{pointer-events:none;cursor:default;opacity:.4;filter:drop-shadow(0 6px 10px rgba(20,20,20,.045));}
+  .fold.is-focus{filter:drop-shadow(0 22px 28px rgba(20,20,20,.16));z-index:14;}
+  .fold.is-open{opacity:.3;filter:drop-shadow(0 4px 8px rgba(20,20,20,.06));}
+  .fold:focus-visible{outline:1px solid var(--h-accent);outline-offset:5px;}
+
+  .fold-label{
+    position:absolute;left:50%;top:-26px;transform:translate(-50%,7px);
+    white-space:nowrap;font-size:10px;letter-spacing:.3em;color:var(--h-accent);
+    opacity:0;transition:opacity .35s ease,transform .45s cubic-bezier(.2,.7,.2,1),letter-spacing .5s;
+    pointer-events:none;
+  }
+  .fold.is-focus .fold-label{opacity:1;transform:translate(-50%,0);letter-spacing:.42em;}
+  .fold-label::after{content:'';position:absolute;left:50%;top:100%;margin-top:5px;width:1px;height:7px;background:currentColor;opacity:.55;}
+  .fold-no{
+    position:absolute;left:50%;bottom:-19px;transform:translateX(-50%);
+    font-size:8.5px;letter-spacing:.26em;color:var(--h-gray);white-space:nowrap;
+    transition:color .35s;
+  }
+  .fold.is-focus .fold-no{color:var(--h-accent);}
+
+  /* 档案袋矢量 */
+  .fp-body{fill:rgba(255,255,255,.72);stroke:rgba(20,20,20,.58);stroke-width:1.1;}
+  .fold .fp-body{fill:rgba(255,255,255,.9);stroke:rgba(20,20,20,.64);}
+  .fold.ghost .fp-body{fill:rgba(255,255,255,.4);stroke:rgba(20,20,20,.32);}
+  .fp-inner{fill:none;stroke:rgba(20,20,20,.14);stroke-width:.8;}
+  .fp-tag{fill:rgba(255,255,255,.8);stroke:rgba(20,20,20,.22);stroke-width:.7;}
+  .fp-eye{fill:rgba(255,255,255,.9);stroke:rgba(20,20,20,.4);stroke-width:.8;}
+  .fp-eye-c{fill:rgba(20,20,20,.45);}
+  .fp-txt{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:5.2px;letter-spacing:.12em;fill:rgba(20,20,20,.52);}
+  .fp-no{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:8.6px;letter-spacing:.16em;fill:rgba(20,20,20,.72);}
+  .fp-reel{fill:none;stroke:rgba(20,20,20,.13);stroke-width:1;}
+  .fp-diag{fill:none;stroke:rgba(20,20,20,.5);stroke-width:.9;}
+  .fp-bar{fill:none;stroke:rgba(20,20,20,.4);stroke-width:.7;}
+
+  /* 读取槽 + 场景框 */
+  .tape-stage{position:absolute;left:62vw;top:27vh;width:32.5vw;height:54vh;z-index:8;}
+  .slot{
+    display:flex;align-items:center;gap:12px;height:44px;padding:0 14px;
+    border:1px solid var(--h-line);background:var(--h-panel);
+    font-size:9px;letter-spacing:.24em;color:var(--h-gray);
+    transition:border-color .4s,background .4s;
+  }
+  .slot-led{width:6px;height:6px;border-radius:50%;background:rgba(20,20,20,.16);transition:.35s;flex:none;}
+  .panel-home.is-open .slot-led{background:var(--h-accent);box-shadow:0 0 10px rgba(31,73,255,.6);}
+  .slot-mini{width:34px;height:22px;opacity:.3;transition:.4s;flex:none;}
+  .panel-home.is-open .slot-mini{opacity:1;}
+  .slot-mini .pin{transition:.4s;}
+  .panel-home.is-open .slot-mini .pin{fill:var(--h-accent);}
+
+  .scene-frame{
+    position:relative;margin-top:14px;height:calc(100% - 58px);
+    border:1px solid var(--h-line);background:var(--h-panel);overflow:hidden;
+  }
+  .scene-frame::before{
+    content:'';position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(var(--h-line-2) 1px,transparent 1px),linear-gradient(90deg,var(--h-line-2) 1px,transparent 1px);
+    background-size:34px 34px;
+  }
+  .scene-svg{position:absolute;inset:0;}
+  .scene-svg svg{display:block;width:100%;height:100%;}
+  .scene-empty{
+    position:absolute;inset:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;font-size:9.5px;letter-spacing:.3em;color:var(--h-gray);
+    border:1px dashed var(--h-line);
+  }
+  .scene-empty .plus{font-size:16px;letter-spacing:0;color:var(--h-accent);}
+  .panel-home.is-open .scene-empty{display:none;}
+
+  /* ============ 档案照片：真实图像融入纸面 ============ */
+  .ph{
+    position:absolute;overflow:hidden;background:#e3e1db;
+    border:1px solid rgba(20,20,20,.4);
+    box-shadow:0 6px 15px rgba(20,20,20,.06);
+  }
+  .ph img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+    filter:grayscale(.85) contrast(1.02) brightness(1.12) sepia(.05);
+    mix-blend-mode:multiply;opacity:.95;
+  }
+  .ph-net,.ph-vig{position:absolute;inset:0;pointer-events:none;}
+  .ph-net{
+    background-image:radial-gradient(rgba(20,20,20,.62) .4px,transparent .5px);
+    background-size:3px 3px;opacity:.12;mix-blend-mode:multiply;
+  }
+  .ph-vig{box-shadow:inset 0 0 32px rgba(20,20,20,.2);}
+  .ph-strip{
+    position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;
+    gap:8px;padding:4px 7px;white-space:nowrap;overflow:hidden;
+    font-size:6.6px;letter-spacing:.16em;color:rgba(20,20,20,.5);
+    background:rgba(231,230,226,.9);border-top:1px solid rgba(20,20,20,.16);
+  }
+  .ph-strip b{font-weight:400;color:rgba(20,20,20,.82);}
+  .ph-code{
+    position:absolute;left:0;top:0;padding:2px 6px;
+    font-size:6.4px;letter-spacing:.2em;
+    color:rgba(255,255,255,.92);background:rgba(20,20,20,.6);
+  }
+
+  /* 三份档案的照片版式 */
+  .ph-pano{left:3.5%;top:4%;width:93%;height:70%;}
+  .ph-pano img{object-position:50% 50%;}
+  .ph-gate{left:3.5%;top:4%;width:93%;height:38%;}
+  .ph-gate img{object-position:50% 42%;}
+  .ph-statue{left:3.5%;top:45%;width:44.5%;height:45%;}
+  .ph-statue img{object-position:50% 20%;}
+  .ph-steps{left:52%;top:45%;width:44.5%;height:45%;}
+  .ph-steps img{object-position:50% 46%;}
+  .ph-fruit{left:43%;top:4%;width:53.5%;height:82%;}
+  .ph-fruit img{object-position:50% 10%;filter:grayscale(.9) contrast(1.02) brightness(1.26) sepia(.04);}
+
+  /* 蓝图标注：十字 / 引线 / 标签 / 比例尺 */
+  .ph-cross{position:absolute;width:11px;height:11px;color:var(--h-accent);}
+  .ph-cross::before,.ph-cross::after{content:'';position:absolute;background:currentColor;}
+  .ph-cross::before{left:50%;top:0;bottom:0;width:1px;transform:translateX(-.5px);}
+  .ph-cross::after{top:50%;left:0;right:0;height:1px;transform:translateY(-.5px);}
+  .ph-rule{position:absolute;height:1px;background:linear-gradient(90deg,rgba(31,73,255,.6),rgba(31,73,255,.15));transform-origin:0 50%;}
+  .ph-lab{
+    position:absolute;padding:2px 6px;font-size:6.6px;letter-spacing:.18em;white-space:nowrap;
+    color:rgba(20,20,20,.66);background:rgba(231,230,226,.9);border:1px solid rgba(20,20,20,.16);
+  }
+  .ph-info{
+    position:absolute;left:3.5%;right:3.5%;bottom:12%;
+    display:flex;align-items:center;gap:9px;
+    font-size:6.6px;letter-spacing:.2em;color:rgba(20,20,20,.45);
+  }
+  .ph-info::before{content:'';position:absolute;left:0;right:0;top:-9px;height:1px;background:rgba(20,20,20,.16);}
+  .ph-scale{
+    flex:none;width:38px;height:5px;
+    border-left:1px solid rgba(20,20,20,.5);border-right:1px solid rgba(20,20,20,.5);
+    background:repeating-linear-gradient(90deg,rgba(20,20,20,.5) 0 1px,transparent 1px 6px);
+  }
+
+  /* 荔枝：放大镜与左侧信息栏 */
+  .ph-lens{
+    position:absolute;aspect-ratio:1/1;border-radius:50%;overflow:hidden;
+    background-image:url(arch-lychee.jpg);background-size:300%;background-position:44% 16%;
+    border:1px solid rgba(20,20,20,.42);
+    box-shadow:inset 0 0 26px rgba(20,20,20,.22),0 6px 14px rgba(20,20,20,.06);
+    filter:grayscale(.9) contrast(1.02) brightness(1.22);
+  }
+  .ph-lens::before,.ph-lens::after{content:'';position:absolute;background:rgba(31,73,255,.5);}
+  .ph-lens::before{left:50%;top:0;bottom:0;width:1px;}
+  .ph-lens::after{top:50%;left:0;right:0;height:1px;}
+  .ph-side{position:absolute;left:4%;top:4%;width:36%;}
+  .ph-side-t{font-size:13px;letter-spacing:.2em;color:var(--h-ink);line-height:1.4;}
+  .ph-side-en{margin-top:5px;font-size:6.4px;letter-spacing:.2em;color:var(--h-gray);}
+  .ph-side-r{display:block;height:1px;background:var(--h-line);margin:9px 0;}
+  .ph-side-d{font-size:8px;line-height:2;letter-spacing:.1em;color:var(--h-txt);}
+
+  /* 显影式载入 */
+  #sceneSvg .ph{clip-path:inset(0 0 100% 0);opacity:0;}
+  #sceneSvg.is-drawn .ph{animation:phIn .95s cubic-bezier(.3,.78,.18,1) forwards;animation-delay:calc(var(--d,0) * 1ms);}
+  @keyframes phIn{from{clip-path:inset(0 0 100% 0);opacity:.4;}to{clip-path:inset(0 0 0 0);opacity:1;}}
+  #sceneSvg .appear{opacity:0;}
+  #sceneSvg.is-drawn .appear{animation:sceneFade .7s ease forwards;animation-delay:calc(560ms + var(--d,0) * 1ms);}
+  @keyframes sceneFade{to{opacity:1}}
+
+  .scene-cap{
+    position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;
+    padding:9px 13px;font-size:9px;letter-spacing:.24em;color:var(--h-gray);
+    border-top:1px solid var(--h-line);background:rgba(231,230,226,.78);
+  }
+  .scene-cap b{font-weight:400;color:var(--h-ink);}
+  .load-msg{
+    position:absolute;right:0;bottom:-26px;font-size:9px;letter-spacing:.26em;color:var(--h-accent);
+    opacity:0;transform:translateY(4px);transition:.45s;
+  }
+  .panel-home.is-open .load-msg{opacity:1;transform:none;}
+
+  /* 底部档案索引（点选载入，与卡带同步高亮） */
+  .home-index{
+    position:absolute;left:6vw;top:79vh;width:52vw;z-index:9;
+    color:var(--h-gray);letter-spacing:.2em;
+  }
+  .hi-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding-top:10px;border-top:1px solid var(--h-line);
+    font-size:8.5px;letter-spacing:.28em;
+  }
+  .hi-head b{font-weight:400;color:var(--h-ink);}
+  .hi-list{display:flex;margin-top:9px;border-top:1px solid var(--h-line-2);}
+  .hi-row{
+    flex:1;display:flex;align-items:flex-start;gap:10px;
+    padding:11px 14px 11px 0;border:none;background:transparent;
+    border-right:1px solid var(--h-line-2);text-align:left;
+    font:inherit;letter-spacing:.18em;color:inherit;cursor:pointer;
+    transition:background .3s,color .3s;
+  }
+  .hi-row:last-child{border-right:none;}
+  .hi-row b{font-size:9px;font-weight:400;color:var(--h-accent);letter-spacing:.16em;flex:none;line-height:1.6;}
+  .hi-row em{font-style:normal;display:block;font-size:9.5px;color:var(--h-txt);letter-spacing:.2em;transition:color .3s;}
+  .hi-row i{font-style:normal;display:block;margin-top:5px;font-size:7.5px;letter-spacing:.16em;color:var(--h-gray);}
+  .hi-row:hover,.hi-row.is-active{background:rgba(31,73,255,.045);}
+  .hi-row:hover em,.hi-row.is-active em{color:var(--h-accent);}
+  .hi-row:focus-visible{outline:1px solid var(--h-accent);outline-offset:-3px;}
+
+  /* 深色线框视图 */
+  body.wireframe .panel-home{
+    --h-ink:#d8d8d8;--h-txt:#a8a8a8;--h-gray:#7a7a7a;
+    --h-line:rgba(255,255,255,.18);--h-line-2:rgba(255,255,255,.08);--h-panel:rgba(255,255,255,.025);
+  }
+  body.wireframe .hm-rule,body.wireframe .rack-rail{background:rgba(255,255,255,.16);}
+  body.wireframe .fp-body{fill:rgba(255,255,255,.03);stroke:rgba(255,255,255,.34);}
+  body.wireframe .fp-inner{stroke:rgba(255,255,255,.12);}
+  body.wireframe .fp-tag{fill:rgba(255,255,255,.03);stroke:rgba(255,255,255,.16);}
+  body.wireframe .fp-eye{fill:none;stroke:rgba(255,255,255,.3);}
+  body.wireframe .fp-eye-c{fill:rgba(255,255,255,.35);}
+  body.wireframe .fp-txt{fill:rgba(255,255,255,.3);}
+  body.wireframe .fp-no{fill:rgba(255,255,255,.5);}
+  body.wireframe .fp-reel{stroke:rgba(255,255,255,.1);}
+  body.wireframe .fp-diag{stroke:rgba(255,255,255,.4);}
+  body.wireframe .fp-bar{stroke:rgba(255,255,255,.3);}
+  body.wireframe .fold{filter:none;}
+  body.wireframe .fold.ghost{opacity:.26;}
+  body.wireframe .ph{background:#0f0f11;border-color:rgba(255,255,255,.26);box-shadow:none;}
+  body.wireframe .ph img,body.wireframe .ph-lens{
+    filter:grayscale(1) invert(1) contrast(1.15) brightness(.9);
+    mix-blend-mode:screen;opacity:.45;
+  }
+  body.wireframe .ph-net{opacity:.05;background-image:radial-gradient(rgba(255,255,255,.55) .4px,transparent .5px);}
+  body.wireframe .ph-vig{box-shadow:inset 0 0 36px rgba(0,0,0,.5);}
+  body.wireframe .ph-strip{background:rgba(12,12,14,.86);border-top-color:rgba(255,255,255,.14);color:rgba(255,255,255,.42);}
+  body.wireframe .ph-strip b{color:rgba(255,255,255,.74);}
+  body.wireframe .ph-code{background:rgba(10,10,12,.85);color:#cfcfcf;}
+  body.wireframe .ph-lab{background:rgba(10,10,12,.86);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.6);}
+  body.wireframe .ph-info{color:rgba(255,255,255,.4);}
+  body.wireframe .ph-info::before{background:rgba(255,255,255,.16);}
+  body.wireframe .ph-scale{border-color:rgba(255,255,255,.4);background:repeating-linear-gradient(90deg,rgba(255,255,255,.4) 0 1px,transparent 1px 6px);}
+  body.wireframe .ph-lens::before,body.wireframe .ph-lens::after{background:rgba(255,255,255,.35);}
+  body.wireframe .ph-side-r{background:rgba(255,255,255,.16);}
+  body.wireframe .scene-cap{background:rgba(12,12,14,.82);}
+  body.wireframe .hi-row:hover,body.wireframe .hi-row.is-active{background:rgba(255,255,255,.05);}
+
+  @media (max-width:1100px){
+    .home-meta{top:31vh;width:19vw;min-width:150px;}
+    .hm-os{font-size:11px;letter-spacing:.24em;}
+    .tape-rack{left:22vw;width:40vw;top:21vh;height:56vh;}
+    .tape-stage{left:64vw;width:30vw;top:29vh;height:46vh;}
+    .home-index{top:80vh;width:56vw;}
+  }
+  @media (max-width:820px){
+    .home-meta{left:7vw;top:26vh;width:44vw;}
+    .hm-txt.dim{display:none;}
+    .hm-file{margin-top:1.2em;}
+    .home-meta .hm-sub{display:none;}
+    .tape-rack{left:7vw;top:33vh;width:86vw;height:26vh;perspective:none;}
+    .fold{width:20vw;}
+    .fold.ghost{display:none;}
+    .tape-stage{left:7vw;top:62vh;width:86vw;height:30vh;}
+    .slot{height:38px;}
+    .scene-frame{margin-top:10px;height:calc(100% - 46px);}
+    .load-msg{display:none;}
+    .scene-cap{font-size:8px;padding:7px 10px;}
+    .home-index{display:none;}
+    .ph-pano{height:62%;}
+    .ph-gate{height:34%;}
+    .ph-statue,.ph-steps{top:41%;height:48%;}
+    .ph-fruit{left:40%;width:56.5%;height:84%;}
+    .ph-lens{display:none;}
+    .ph-side{width:34%;}
+    .ph-side-t{font-size:11px;}
+    .ph-side-d{display:none;}
+    .ph-info{bottom:15%;}
+    .ph-strip{font-size:5.8px;padding:3px 5px;}
+    .ph-lab{font-size:6px;}
+  }
 </style>
 </head>
 <body>
@@ -583,6 +905,59 @@ animation:x
         <div class="b" style="height:24%;"></div><div class="b" style="height:38%;"></div>
         <div class="b" style="height:44%;"></div><div class="b" style="height:28%;"></div>
       </div>
+    </section>
+
+    <!-- ═══════════ PANEL 1H · ACT-1H 故乡（新增 · 卡带档案） ═══════════ -->
+    <section class="panel panel-home" data-act="ACT-1H" id="homePanel">
+      <p class="act-tag"><b>ACT-1H</b>&nbsp;&nbsp;[ LINGSHAN ARCHIVE · 故乡 ]</p>
+      <h2 class="panel-title">故&nbsp;乡<span class="en-sub">HOME&nbsp;/&nbsp;广西钦州市灵山县&nbsp;/&nbsp;001H</span></h2>
+
+      <div class="home-meta">
+        <p class="hm-os">LINGSHAN ARCHIVE OS</p>
+        <p class="hm-sub">SYNTHESIZE MEMORY / ANALYSIS HOME</p>
+        <div class="hm-file"><span>FILE NO.</span><b id="tapeFileNo">LS-001</b></div>
+        <span class="hm-rule"></span>
+        <p class="hm-txt">广西 · 钦州市 · 灵山县<br>22.42°N&nbsp;&nbsp;109.29°E</p>
+        <p class="hm-txt dim">六峰山下，荔枝林间。<br>宏观是山城与江河，<br>微观是石阶上的一线光。</p>
+      </div>
+
+      <div class="tape-rack" id="tapeRack">
+        <div class="fold-field" id="foldField"></div>
+        <span class="rack-rail"></span>
+      </div>
+
+      <div class="tape-stage">
+        <div class="slot">
+          <span class="slot-led"></span>
+          <svg class="slot-mini" viewBox="0 0 34 22" aria-hidden="true">
+            <path d="M1 6 H11 L14 3 H33 V20 H1 Z" fill="none" stroke="rgba(20,20,20,.4)" stroke-width="1"/>
+            <path d="M5 10 H29" fill="none" stroke="rgba(20,20,20,.28)" stroke-width=".8"/>
+            <circle class="pin" cx="28" cy="16" r="2" fill="rgba(20,20,20,.3)"/>
+          </svg>
+          <span id="slotTxt">NO FILE / 请选择档案</span>
+        </div>
+        <div class="scene-frame">
+          <div class="scene-empty">
+            <span class="plus">+</span>
+            <span>SELECT A FILE</span>
+            <span>指向起伏 · 点击载入</span>
+          </div>
+          <div class="scene-svg" id="sceneSvg"></div>
+          <div class="scene-cap"><span id="sceneCapNo">LS-000</span><span id="sceneCapTxt"><b>关于我的家乡</b></span></div>
+        </div>
+        <p class="load-msg">载入完成 / LOAD COMPLETE</p>
+      </div>
+
+      <div class="home-index" id="homeIndex">
+        <div class="hi-head">
+          <span><b>TAPE ARCHIVE</b>&nbsp;&nbsp;·&nbsp;&nbsp;SIDE A</span>
+          <span>3 ITEMS&nbsp;&nbsp;/&nbsp;&nbsp;4.76 CM·S⁻¹</span>
+        </div>
+        <div class="hi-list" id="hiList"></div>
+      </div>
+
+      <span class="mark" style="left:24vw;top:22vh;">+ LS-001</span>
+      <span class="mark" style="right:6vw;top:22vh;">N↑&nbsp;&nbsp;22.42°N</span>
     </section>
 
     <!-- ═══════════ PANEL 2 · ACT-2 作品 ═══════════ -->
@@ -2712,6 +3087,409 @@ animation:x
 })();
 </script>
 <!-- ==================== 【新增模块】结束 ==================== -->
+
+<!-- ==================================================================
+     【新增模块】ACT-1H 故乡 · 卡带档案
+     说明：全部为新增，不修改原有面板的布局 / 文字 / 作品内容。
+     - 三张卡带（LS-001/002/003）悬停浮起并显示名称，点击载入
+     - 右侧读取槽 + SVG 线稿场景（全景 / 六峰山 / 灵山荔枝）
+     - 音效全部用 Web Audio 现场合成，无外部音频文件，依赖点击手势
+     可调参数集中在 TAPES 与 TAPE_SFX_VOL
+     ================================================================== -->
+<script>
+(function () {
+  var panel = document.getElementById('homePanel');
+  if (!panel) return;
+
+  var rack     = document.getElementById('tapeRack');
+  var sceneSvg = document.getElementById('sceneSvg');
+  var slotTxt  = document.getElementById('slotTxt');
+  var fileNoEl = document.getElementById('tapeFileNo');
+  var capNo    = document.getElementById('sceneCapNo');
+  var capTxt   = document.getElementById('sceneCapTxt');
+
+  /* ---------- 可调参数 ---------- */
+  var TAPE_SFX_VOL = 0.5;   // 音效总音量 0-1
+
+  var TAPES = [
+    { no: 'LS-001', name: '关于我的家乡', short: 'PANORAMA / 山城与江河', scene: 'home',   x: 1,  y: 13, r: -3.2 },
+    { no: 'LS-002', name: '六峰山',      short: 'LIUFENG MT. / 门 · 阶 · 像', scene: 'peak',  x: 32, y: 1,  r: 1.4 },
+    { no: 'LS-003', name: '灵山荔枝',    short: 'LYCHEE / 果实与枝叶',      scene: 'lychee', x: 63, y: 12, r: 4.6 }
+  ];
+
+  /* ---------- 档案袋矢量 ---------- */
+  function folderSVG(t) {
+    var no = t ? t.no.slice(3) : '';
+    var bar = '';
+    for (var i = 0; i < 12; i++) {
+      bar += 'M' + (22 + i * 10) + ' 190 V' + (i % 3 ? 200 : 204) + ' ';
+    }
+    var head = t
+      ? '<rect class="fp-tag" x="15" y="30" width="96" height="40" rx="1"/>' +
+        '<text class="fp-txt" x="21" y="42">LINGSHAN ARCHIVE LLC</text>' +
+        '<text class="fp-no" x="21" y="61">NO.' + no + '</text>'
+      : '<path class="fp-bar" d="M20 38 H92 M20 50 H70"/>';
+
+    return '<svg viewBox="0 0 160 220" aria-hidden="true">' +
+      /* 纸袋主体（左上舌片） */
+      '<path class="fp-body" d="M4 26 H54 L62 14 H148 Q154 14 154 20 V208 Q154 216 146 216 H12 Q4 216 4 208 Z"/>' +
+      '<path class="fp-inner" d="M11 33 H52 L59 21 H147 V208 H11 Z"/>' +
+      /* 四角铆钉 */
+      '<circle class="fp-eye" cx="15" cy="30" r="2.6"/><circle class="fp-eye-c" cx="15" cy="30" r=".8"/>' +
+      '<circle class="fp-eye" cx="145" cy="30" r="2.6"/><circle class="fp-eye-c" cx="145" cy="30" r=".8"/>' +
+      '<circle class="fp-eye" cx="15" cy="205" r="2.6"/><circle class="fp-eye-c" cx="15" cy="205" r=".8"/>' +
+      '<circle class="fp-eye" cx="145" cy="205" r="2.6"/><circle class="fp-eye-c" cx="145" cy="205" r=".8"/>' +
+      head +
+      /* 卷盘水印 */
+      '<circle class="fp-reel" cx="80" cy="128" r="34"/>' +
+      '<circle class="fp-reel" cx="80" cy="128" r="25"/>' +
+      '<circle class="fp-reel" cx="80" cy="128" r="8"/>' +
+      /* 密级斜线 */
+      (t ? '<path class="fp-diag" d="M18 202 L142 50"/>' : '') +
+      '<path class="fp-bar" d="' + bar + '"/>' +
+      '</svg>';
+  }
+
+  /* ---------- 场景一：县城全景 ---------- */
+  function plate(cls, src, alt, d, code, capL, capR) {
+    return '<figure class="ph ' + cls + '" style="--d:' + d + '">' +
+      '<img src="' + src + '" alt="' + alt + '" decoding="async">' +
+      '<span class="ph-net"></span><span class="ph-vig"></span>' +
+      '<span class="ph-code">' + code + '</span>' +
+      '<figcaption class="ph-strip"><b>' + capL + '</b><span>' + capR + '</span></figcaption>' +
+      '</figure>';
+  }
+
+  function sceneHome() {
+    return plate('ph-pano', 'arch-home.jpg', '灵山县城全景：环岛铜马、老城街区与钦江', 0,
+        'PANORAMA 04×', '灵山县城 / LINGSHAN', '22.42°N&nbsp;&nbsp;109.29°E') +
+      '<span class="ph-cross appear" style="left:46.5%;top:37%;--d:420"></span>' +
+      '<span class="ph-rule appear" style="left:48%;top:38.5%;width:9%;transform:rotate(-26deg);--d:430"></span>' +
+      '<span class="ph-lab appear" style="left:57.5%;top:28%;--d:470">+ 环岛 / ROUNDABOUT</span>' +
+      '<span class="ph-cross appear" style="left:15%;top:60%;--d:500"></span>' +
+      '<span class="ph-lab appear" style="left:17%;top:61%;--d:540">+ 钦江 / QIN RIVER</span>' +
+      '<div class="ph-info appear" style="--d:600">' +
+        '<span>SCALE 1:2000</span><span class="ph-scale"></span><span>0 — 2KM</span>' +
+      '</div>';
+  }
+
+  /* ---------- 场景二：六峰山（门 · 石阶 · 中山像） ---------- */
+  function scenePeak() {
+    return plate('ph-gate', 'arch-gate.jpg', '六峰山山门牌坊与檐下红灯笼', 60,
+        'PK-01', '山门 / GATE', '六峰山 MT. LIUFENG') +
+      plate('ph-statue', 'arch-statue.jpg', '六峰山下的孙中山先生铜像', 200,
+        'PK-02', '孙中山先生像 / STATUE', '六峰山 · 山脚') +
+      plate('ph-steps', 'arch-steps.jpg', '六峰山石阶与红漆栏杆', 320,
+        'PK-03', '石阶 / STONE STEPS', '夕照 · 上行') +
+      '<span class="ph-cross appear" style="left:50%;top:22%;--d:480"></span>';
+  }
+
+  /* ---------- 场景三：灵山荔枝 ---------- */
+  function sceneLychee() {
+    return plate('ph-fruit', 'arch-lychee.jpg', '灵山荔枝果簇与叶片', 100,
+        'LY-01', '灵山荔枝 / LYCHEE', '6–7月 · 中国荔枝之乡') +
+      '<div class="ph-side appear" style="--d:280">' +
+        '<p class="ph-side-t">+ 灵山荔枝</p>' +
+        '<p class="ph-side-en">LYCHEE · LITCHI</p>' +
+        '<span class="ph-side-r"></span>' +
+        '<p class="ph-side-d">果皮龟裂 · 果肉半透<br>核小汁多 · 六月末熟</p>' +
+      '</div>' +
+      '<div class="ph-lens appear" style="left:4%;top:38%;width:32%;--d:400"></div>' +
+      '<span class="ph-lab appear" style="left:4%;top:79%;--d:450">DETAIL / 果皮龟裂</span>' +
+      '<div class="ph-info appear" style="--d:520">' +
+        '<span>Ø 30–38MM</span><span class="ph-scale"></span>' +
+      '</div>';
+  }
+
+  var SCENES = { home: sceneHome, peak: scenePeak, lychee: sceneLychee };
+
+  /* ---------- 音效（Web Audio 实时合成，点击触发） ---------- */
+  var AC = null;
+  function ac() {
+    if (!AC) {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      try { AC = new Ctx(); } catch (e) { return null; }
+    }
+    if (AC.state === 'suspended') { AC.resume(); }
+    return AC;
+  }
+  function noise(sec) {
+    var a = ac(); if (!a) return null;
+    var n = Math.max(1, Math.floor(a.sampleRate * sec));
+    var buf = a.createBuffer(1, n, a.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+  function sfxClick(gain) {
+    var a = ac(); if (!a) return;
+    var t = a.currentTime;
+    var src = a.createBufferSource(); src.buffer = noise(0.05);
+    var bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2500; bp.Q.value = 1.1;
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.2 * TAPE_SFX_VOL * (gain || 1), t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.06);
+    src.connect(bp); bp.connect(g); g.connect(a.destination);
+    src.start(t);
+
+    var o = a.createOscillator(), og = a.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(170, t);
+    o.frequency.exponentialRampToValueAtTime(72, t + 0.09);
+    og.gain.setValueAtTime(0.12 * TAPE_SFX_VOL, t);
+    og.gain.exponentialRampToValueAtTime(0.0006, t + 0.12);
+    o.connect(og); og.connect(a.destination);
+    o.start(t); o.stop(t + 0.13);
+  }
+  function sfxInsert() {
+    sfxClick(1);
+    var a = ac(); if (!a) return;
+    setTimeout(function () {
+      sfxClick(0.7);
+      var t = a.currentTime;
+      var o = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(44, t);
+      o.frequency.linearRampToValueAtTime(96, t + 0.55);
+      lp.type = 'lowpass'; lp.frequency.value = 420;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.055 * TAPE_SFX_VOL, t + 0.09);
+      g.gain.exponentialRampToValueAtTime(0.0008, t + 0.8);
+      o.connect(lp); lp.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 0.85);
+    }, 170);
+  }
+  function sfxTapeHiss(sec) {
+    var a = ac(); if (!a) return;
+    var t = a.currentTime;
+    var src = a.createBufferSource(); src.buffer = noise(sec);
+    var lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3000;
+    var g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.045 * TAPE_SFX_VOL, t + 0.18);
+    g.gain.exponentialRampToValueAtTime(0.0004, t + sec);
+    src.connect(lp); lp.connect(g); g.connect(a.destination);
+    src.start(t);
+  }
+
+  /* ---------- 构建档案袋阵列 ---------- */
+  var tapes = [];
+  var field = [];
+  var fieldEl = document.getElementById('foldField');
+
+  /* 前排三份为可交互档案，后排为氛围档案 */
+  var FRONT = [
+    { c: 1.0, t: 38, s: 1.02, rz: -2.2 },
+    { c: 2.1, t: 36, s: 1.05, rz: 1.4 },
+    { c: 3.2, t: 39, s: 1.01, rz: 3.0 }
+  ];
+  var GHOST = [];
+  (function () {
+    for (var r = 0; r < 2; r++) {
+      for (var c = 0; c < 4; c++) {
+        GHOST.push({
+          c: c + r * 0.3,
+          t: 18 - r * 16,
+          s: 0.87 - r * 0.13,
+          rz: (c % 2 ? 2.6 : -2.8) + r * 1.4
+        });
+      }
+    }
+  })();
+
+  function makeFold(cfg, cls, inner, z) {
+    var el = document.createElement('div');
+    el.className = cls;
+    el.style.setProperty('--c', cfg.c);
+    el.style.setProperty('--t', cfg.t);
+    el.style.setProperty('--s', cfg.s);
+    el.style.setProperty('--rz', cfg.rz);
+    el.style.zIndex = z;
+    el.innerHTML = inner;
+    fieldEl.appendChild(el);
+    return el;
+  }
+
+  GHOST.forEach(function (g, i) {
+    var el = makeFold(g, 'fold ghost', folderSVG(null), 2 + (i < 5 ? 1 : 0));
+    el.setAttribute('aria-hidden', 'true');
+    field.push({ el: el, ph: i * 0.7 });
+  });
+
+  TAPES.forEach(function (t, i) {
+    var el = makeFold(FRONT[i], 'fold', folderSVG(t) +
+      '<span class="fold-label">' + t.name + '</span>' +
+      '<span class="fold-no">' + t.no + '</span>', 8 + i);
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', '档案 ' + t.no + ' ' + t.name + '，点击载入');
+    el.addEventListener('mouseenter', function () { setFocus(i); });
+    el.addEventListener('focus', function () { setFocus(i); });
+    el.addEventListener('click', function () { load(i); });
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); load(i); }
+    });
+    tapes.push(el);
+    field.push({ el: el, ph: i * 1.1 });
+  });
+
+  /* ---------- 指针波澜：指向处档案袋起伏 ---------- */
+  var ptrX = -9999, ptrY = -9999, ptrOn = false;
+  rack.addEventListener('pointermove', function (e) {
+    var b = rack.getBoundingClientRect();
+    ptrX = e.clientX - b.left;
+    ptrY = e.clientY - b.top;
+    ptrOn = true;
+  });
+  rack.addEventListener('pointerleave', function () { ptrOn = false; });
+  rack.addEventListener('pointercancel', function () { ptrOn = false; });
+
+  function measureField() {
+    field.forEach(function (f) {
+      f.cx = f.el.offsetLeft + f.el.offsetWidth / 2;
+      f.cy = f.el.offsetTop + f.el.offsetHeight / 2;
+    });
+  }
+  measureField();
+  window.addEventListener('resize', measureField);
+
+  (function waveLoop(ts) {
+    var t = ts * 0.001;
+    for (var i = 0; i < field.length; i++) {
+      var f = field[i];
+      var dx = f.cx - ptrX, dy = f.cy - ptrY;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      var inf = ptrOn ? Math.exp(-(d * d) / 46000) : 0;
+      var rip = 0.55 + 0.45 * Math.sin(t * 2.2 - d * 0.016 + f.ph);
+      var u = inf * rip + 0.05 * (1 + Math.sin(t * 1.1 + f.ph));
+      f.el.style.setProperty('--u', u.toFixed(3));
+    }
+    requestAnimationFrame(waveLoop);
+  })(0);
+
+  var openIdx = -1;
+  var focusIdx = 0;
+
+  /* ---------- 底部索引（与卡带联动） ---------- */
+  var hiList = document.getElementById('hiList');
+  var hiRows = [];
+  if (hiList) {
+    TAPES.forEach(function (t, i) {
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'hi-row';
+      row.innerHTML = '<b>' + t.no.slice(3) + '</b><span><em>' + t.name +
+        '</em><i>' + t.short + '</i></span>';
+      row.addEventListener('mouseenter', function () { setFocus(i); });
+      row.addEventListener('focus', function () { setFocus(i); });
+      row.addEventListener('click', function () { load(i); });
+      hiList.appendChild(row);
+      hiRows.push(row);
+    });
+  }
+
+  function setFocus(i) {
+    focusIdx = i;
+    tapes.forEach(function (el, k) { el.classList.toggle('is-focus', k === i); });
+    hiRows.forEach(function (el, k) { el.classList.toggle('is-active', k === i); });
+    fileNoEl.textContent = TAPES[i].no;
+  }
+
+  function markOpen(i) {
+    tapes.forEach(function (el, k) { el.classList.toggle('is-open', k === i); });
+  }
+
+  function paint(i) {
+    var t = TAPES[i];
+    sceneSvg.innerHTML = SCENES[t.scene]();
+    sceneSvg.classList.remove('is-drawn');
+    void sceneSvg.offsetWidth;
+    sceneSvg.classList.add('is-drawn');
+    capNo.textContent = t.no;
+    capTxt.innerHTML = '<b>' + t.name + '</b>';
+    slotTxt.textContent = 'LOADED / ' + t.no;
+    sfxTapeHiss(1.4);
+  }
+
+  function fly(i) {
+    var el = tapes[i];
+    var from = el.getBoundingClientRect();
+    var to = panel.querySelector('.slot').getBoundingClientRect();
+    if (!from.width || !el.animate) return;
+    var ghost = el.cloneNode(true);
+    ghost.removeAttribute('tabindex');
+    ghost.style.cssText = 'position:fixed;left:' + from.left + 'px;top:' + from.top +
+      'px;width:' + from.width + 'px;height:' + from.height + 'px;margin:0;z-index:130;' +
+      'pointer-events:none;transform:none;filter:none;opacity:1;';
+    document.body.appendChild(ghost);
+    var dx = (to.left + 46) - from.left;
+    var dy = (to.top + 10) - from.top;
+    var sc = 0.46;
+    var anim = ghost.animate([
+      { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
+      { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(-9deg) scale(' + sc + ')', opacity: 0.15 }
+    ], { duration: 520, easing: 'cubic-bezier(.3,.72,.2,1)', fill: 'forwards' });
+    anim.onfinish = function () { ghost.remove(); };
+    setTimeout(function () { if (ghost.parentNode) ghost.remove(); }, 780);
+  }
+
+  function load(i) {
+    if (openIdx === i) { eject(); return; }
+    sfxInsert();
+    fly(i);
+    openIdx = i;
+    panel.classList.add('is-open');
+    markOpen(i);
+    setFocus(i);
+    slotTxt.textContent = 'LOADING / ' + TAPES[i].no;
+    setTimeout(function () { if (openIdx >= 0) paint(i); }, 340);
+  }
+
+  function eject() {
+    openIdx = -1;
+    panel.classList.remove('is-open');
+    markOpen(-1);
+    slotTxt.textContent = 'NO FILE / 请选择档案';
+    capNo.textContent = 'LS-000';
+    capTxt.innerHTML = '<b>关于我的家乡</b>';
+    sfxClick(0.8);
+    setTimeout(function () { if (openIdx < 0) { sceneSvg.innerHTML = ''; } }, 420);
+  }
+
+  function swap(i) {
+    openIdx = i;
+    markOpen(i);
+    setFocus(i);
+    paint(i);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && openIdx >= 0) { eject(); return; }
+    if (openIdx < 0 && !panel.contains(document.activeElement)) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      var fromRow = hiRows.indexOf(document.activeElement) >= 0;
+      var n = (focusIdx + (e.key === 'ArrowRight' ? 1 : TAPES.length - 1)) % TAPES.length;
+      if (openIdx >= 0) { swap(n); } else { setFocus(n); }
+      if (fromRow) { hiRows[n].focus(); } else { tapes[n].focus(); }
+    }
+  });
+
+  /* 进入该面板时播放一次上电入场 */
+  if (window.IntersectionObserver) {
+    new IntersectionObserver(function (es) {
+      es.forEach(function (en) {
+        panel.classList.toggle('is-live', en.isIntersecting);
+      });
+    }, { threshold: 0.3 }).observe(panel);
+  } else {
+    panel.classList.add('is-live');
+  }
+
+  setFocus(0);
+})();
+</script>
 
 
 
